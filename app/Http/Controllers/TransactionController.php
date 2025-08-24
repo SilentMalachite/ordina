@@ -7,7 +7,6 @@ use App\Models\Product;
 use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 use App\Http\Requests\StoreTransactionRequest;
 use App\Http\Requests\UpdateTransactionRequest;
 use App\Events\LowStockDetected;
@@ -207,29 +206,11 @@ class TransactionController extends Controller
 
     public function returnItem(Transaction $transaction)
     {
-        if ($transaction->type !== 'rental') {
-            return redirect()->back()->with('error', 'この取引は貸し出しではありません。');
-        }
-
-        if ($transaction->returned_at) {
-            return redirect()->back()->with('error', 'この商品は既に返却済みです。');
-        }
-
         try {
-            DB::transaction(function() use ($transaction) {
-                $transaction->update(['returned_at' => now()]);
-                
-                $product = $transaction->product;
-                $product->increment('stock_quantity', $transaction->quantity);
-            });
-
+            $transaction->returnItem();
             return redirect()->back()->with('success', '商品の返却が記録されました。');
-            
         } catch (\Exception $e) {
-            \Log::error('商品返却処理中にエラーが発生しました: ' . $e->getMessage());
-            
-            return redirect()->back()
-                ->with('error', 'エラーが発生しました: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'エラーが発生しました: ' . $e->getMessage());
         }
     }
 
