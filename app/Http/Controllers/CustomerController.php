@@ -4,8 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\Transaction;
+use App\Http\Requests\StoreCustomerRequest;
+use App\Http\Requests\UpdateCustomerRequest;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 
 class CustomerController extends Controller
@@ -51,25 +52,9 @@ class CustomerController extends Controller
         return view('customers.create');
     }
 
-    public function store(Request $request)
+    public function store(StoreCustomerRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'type' => 'required|in:individual,company',
-            'email' => 'nullable|email|max:255',
-            'phone' => 'nullable|string|max:20',
-            'address' => 'nullable|string|max:500',
-            'contact_person' => 'nullable|string|max:255',
-            'notes' => 'nullable|string|max:1000',
-        ]);
-
-        if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-
-        Customer::create($request->all());
+        Customer::create($request->validated());
 
         return redirect()->route('customers.index')
             ->with('success', '顧客が正常に登録されました。');
@@ -100,25 +85,9 @@ class CustomerController extends Controller
         return view('customers.edit', compact('customer'));
     }
 
-    public function update(Request $request, Customer $customer)
+    public function update(UpdateCustomerRequest $request, Customer $customer)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'type' => 'required|in:individual,company',
-            'email' => 'nullable|email|max:255',
-            'phone' => 'nullable|string|max:20',
-            'address' => 'nullable|string|max:500',
-            'contact_person' => 'nullable|string|max:255',
-            'notes' => 'nullable|string|max:1000',
-        ]);
-
-        if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-
-        $customer->update($request->all());
+        $customer->update($request->validated());
 
         return redirect()->route('customers.index')
             ->with('success', '顧客情報が正常に更新されました。');
@@ -175,29 +144,15 @@ class CustomerController extends Controller
 
     public function returnItem(Request $request, Customer $customer, Transaction $transaction)
     {
-        if ($transaction->customer_id !== $customer->id || $transaction->type !== 'rental') {
-            return redirect()->back()->with('error', '無効な取引です。');
-        }
-
-        if ($transaction->returned_at) {
-            return redirect()->back()->with('error', 'この商品は既に返却済みです。');
+        if ($transaction->customer_id !== $customer->id) {
+            return redirect()->back()->with('error', '無効な取引です。この取引はこの顧客のものではありません。');
         }
 
         try {
-            DB::transaction(function() use ($transaction) {
-                $transaction->update(['returned_at' => now()]);
-                
-                $product = $transaction->product;
-                $product->increment('stock_quantity', $transaction->quantity);
-            });
-
+            $transaction->returnItem();
             return redirect()->back()->with('success', '商品の返却が記録されました。');
-            
         } catch (\Exception $e) {
-            \Log::error('商品返却処理中にエラーが発生しました: ' . $e->getMessage());
-            
-            return redirect()->back()
-                ->with('error', 'エラーが発生しました。返却処理を完了できませんでした。');
+            return redirect()->back()->with('error', 'エラーが発生しました: ' . $e->getMessage());
         }
     }
 }
