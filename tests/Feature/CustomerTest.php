@@ -5,27 +5,46 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Models\Customer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class CustomerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected $user;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $role = Role::create(['name' => '一般スタッフ']);
+        $permissions = [
+            'customer-list',
+            'customer-create',
+            'customer-edit',
+        ];
+        foreach ($permissions as $permission) {
+            Permission::create(['name' => $permission]);
+        }
+        $role->syncPermissions($permissions);
+
+        $this->user = User::factory()->create();
+        $this->user->assignRole('一般スタッフ');
+    }
+
     public function test_authenticated_user_can_access_customers_index()
     {
-        $user = User::factory()->create();
         Customer::factory()->count(5)->create();
         
-        $response = $this->actingAs($user)->get('/customers');
+        $response = $this->actingAs($this->user)->get('/customers');
         $response->assertStatus(200);
         $response->assertViewHas('customers');
     }
 
     public function test_user_can_create_customer()
     {
-        $user = User::factory()->create();
-        
-        $response = $this->actingAs($user)->get('/customers/create');
+        $response = $this->actingAs($this->user)->get('/customers/create');
         $response->assertStatus(200);
         
         $customerData = [
@@ -37,7 +56,7 @@ class CustomerTest extends TestCase
             'notes' => 'テストノート'
         ];
         
-        $response = $this->actingAs($user)->post('/customers', $customerData);
+        $response = $this->actingAs($this->user)->post('/customers', $customerData);
         
         $response->assertRedirect(route('customers.index'));
         $this->assertDatabaseHas('customers', [
@@ -48,10 +67,9 @@ class CustomerTest extends TestCase
 
     public function test_user_can_update_customer()
     {
-        $user = User::factory()->create();
         $customer = Customer::factory()->create();
         
-        $response = $this->actingAs($user)->get("/customers/{$customer->id}/edit");
+        $response = $this->actingAs($this->user)->get("/customers/{$customer->id}/edit");
         $response->assertStatus(200);
         
         $updatedData = [
@@ -64,7 +82,7 @@ class CustomerTest extends TestCase
             'notes' => '更新されたノート'
         ];
         
-        $response = $this->actingAs($user)->put("/customers/{$customer->id}", $updatedData);
+        $response = $this->actingAs($this->user)->put("/customers/{$customer->id}", $updatedData);
         
         $response->assertRedirect(route('customers.index'));
         $this->assertDatabaseHas('customers', [

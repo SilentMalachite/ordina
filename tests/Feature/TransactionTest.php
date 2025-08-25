@@ -6,32 +6,56 @@ use App\Models\User;
 use App\Models\Product;
 use App\Models\Customer;
 use App\Models\Transaction;
+use App\Events\LowStockDetected;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class TransactionTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected $user;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $role = Role::create(['name' => '一般スタッフ']);
+        $permissions = [
+            'transaction-list',
+            'transaction-create',
+        ];
+        foreach ($permissions as $permission) {
+            Permission::create(['name' => $permission]);
+        }
+        $role->syncPermissions($permissions);
+
+        $this->user = User::factory()->create();
+        $this->user->assignRole($role);
+
+        Event::fake([LowStockDetected::class]);
+    }
+
     public function test_authenticated_user_can_access_transactions_index()
     {
-        $user = User::factory()->create();
         $customer = Customer::factory()->create();
         $product = Product::factory()->create();
         Transaction::factory()->count(5)->create([
             'customer_id' => $customer->id,
             'product_id' => $product->id,
-            'user_id' => $user->id
+            'user_id' => $this->user->id
         ]);
         
-        $response = $this->actingAs($user)->get('/transactions');
+        $response = $this->actingAs($this->user)->get('/transactions');
         $response->assertStatus(200);
         $response->assertViewHas('transactions');
     }
 
     public function test_user_can_create_sale_transaction()
     {
-        $user = User::factory()->create();
         $customer = Customer::factory()->create();
         $product = Product::factory()->create([
             'stock_quantity' => 100,
@@ -39,7 +63,7 @@ class TransactionTest extends TestCase
             'selling_price' => 1500
         ]);
         
-        $response = $this->actingAs($user)->get('/transactions/create');
+        $response = $this->actingAs($this->user)->get('/transactions/create');
         $response->assertStatus(200);
         
         $transactionData = [
@@ -52,7 +76,7 @@ class TransactionTest extends TestCase
             'notes' => 'テスト売上'
         ];
         
-        $response = $this->actingAs($user)->post('/transactions', $transactionData);
+        $response = $this->actingAs($this->user)->post('/transactions', $transactionData);
         
         $response->assertRedirect(route('transactions.index'));
         $this->assertDatabaseHas('transactions', [
@@ -69,7 +93,6 @@ class TransactionTest extends TestCase
 
     public function test_user_can_create_rental_transaction()
     {
-        $user = User::factory()->create();
         $customer = Customer::factory()->create();
         $product = Product::factory()->create([
             'stock_quantity' => 50,
@@ -87,7 +110,7 @@ class TransactionTest extends TestCase
             'notes' => 'テスト貸出'
         ];
         
-        $response = $this->actingAs($user)->post('/transactions', $transactionData);
+        $response = $this->actingAs($this->user)->post('/transactions', $transactionData);
         
         $response->assertRedirect(route('transactions.index'));
         $this->assertDatabaseHas('transactions', [
@@ -104,7 +127,6 @@ class TransactionTest extends TestCase
 
     public function test_user_can_return_rental_item()
     {
-        $user = User::factory()->create();
         $customer = Customer::factory()->create();
         $product = Product::factory()->create(['stock_quantity' => 50]);
         
@@ -112,12 +134,12 @@ class TransactionTest extends TestCase
             'type' => 'rental',
             'customer_id' => $customer->id,
             'product_id' => $product->id,
-            'user_id' => $user->id,
+            'user_id' => $this->user->id,
             'quantity' => 5,
             'returned_at' => null
         ]);
         
-        $response = $this->actingAs($user)->post("/transactions/{$rental->id}/return");
+        $response = $this->actingAs($this->user)->post("/transactions/{$rental->id}/return");
         
         $response->assertRedirect();
         

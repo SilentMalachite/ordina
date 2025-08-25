@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 
 class AdminTest extends TestCase
 {
@@ -23,8 +24,13 @@ class AdminTest extends TestCase
     {
         parent::setUp();
         
-        $this->admin = User::factory()->create(['is_admin' => true]);
-        $this->user = User::factory()->create(['is_admin' => false]);
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+
+        $this->admin = User::factory()->create();
+        $this->admin->assignRole('管理者');
+
+        $this->user = User::factory()->create();
+        $this->user->assignRole('一般スタッフ');
     }
 
     // === 管理者認証テスト ===
@@ -71,7 +77,7 @@ class AdminTest extends TestCase
             'email' => $this->faker->unique()->safeEmail,
             'password' => 'password123',
             'password_confirmation' => 'password123',
-            'is_admin' => false
+            'role' => '一般スタッフ'
         ];
 
         $response = $this->actingAs($this->admin)
@@ -83,8 +89,10 @@ class AdminTest extends TestCase
         $this->assertDatabaseHas('users', [
             'name' => $userData['name'],
             'email' => $userData['email'],
-            'is_admin' => false
         ]);
+
+        $newUser = User::where('email', $userData['email'])->first();
+        $this->assertTrue($newUser->hasRole('一般スタッフ'));
     }
 
     public function test_admin_can_create_admin_user()
@@ -94,7 +102,7 @@ class AdminTest extends TestCase
             'email' => $this->faker->unique()->safeEmail,
             'password' => 'password123',
             'password_confirmation' => 'password123',
-            'is_admin' => true
+            'role' => '管理者'
         ];
 
         $response = $this->actingAs($this->admin)
@@ -105,8 +113,10 @@ class AdminTest extends TestCase
         $this->assertDatabaseHas('users', [
             'name' => $userData['name'],
             'email' => $userData['email'],
-            'is_admin' => true
         ]);
+
+        $newUser = User::where('email', $userData['email'])->first();
+        $this->assertTrue($newUser->hasRole('管理者'));
     }
 
     public function test_admin_can_edit_user()
@@ -124,11 +134,12 @@ class AdminTest extends TestCase
     public function test_admin_can_update_user()
     {
         $targetUser = User::factory()->create();
+        $targetUser->assignRole('一般スタッフ');
         
         $updateData = [
             'name' => 'Updated Name',
             'email' => 'updated@example.com',
-            'is_admin' => true
+            'role' => 'マネージャー'
         ];
 
         $response = $this->actingAs($this->admin)
@@ -141,8 +152,11 @@ class AdminTest extends TestCase
             'id' => $targetUser->id,
             'name' => 'Updated Name',
             'email' => 'updated@example.com',
-            'is_admin' => true
         ]);
+
+        $targetUser->refresh();
+        $this->assertTrue($targetUser->hasRole('マネージャー'));
+        $this->assertFalse($targetUser->hasRole('一般スタッフ'));
     }
 
     public function test_admin_can_delete_user()

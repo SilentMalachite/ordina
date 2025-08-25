@@ -31,7 +31,7 @@ class AdminController extends Controller
             'total_products' => Product::count(),
             'total_customers' => Customer::count(),
             'total_transactions' => Transaction::count(),
-            'admin_users' => User::where('is_admin', true)->count(),
+            'admin_users' => User::role('管理者')->count(),
             'recent_users' => User::where('created_at', '>=', now()->subDays(30))->count(),
             'low_stock_products' => Product::where('stock_quantity', '<=', 10)->count(),
             'active_rentals' => Transaction::where('type', 'rental')->whereNull('returned_at')->count(),
@@ -80,7 +80,6 @@ class AdminController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'is_admin' => $request->role === '管理者',
             'email_verified_at' => now(),
         ]);
         
@@ -115,7 +114,6 @@ class AdminController extends Controller
         $updateData = [
             'name' => $request->name,
             'email' => $request->email,
-            'is_admin' => $request->role === '管理者',
         ];
 
         if ($request->filled('password')) {
@@ -328,7 +326,11 @@ class AdminController extends Controller
             'transactions' => Transaction::with(['product', 'customer'])->get()->toArray(),
             'inventory_adjustments' => InventoryAdjustment::with(['product', 'user'])->get()->toArray(),
             'closing_dates' => ClosingDate::all()->toArray(),
-            'users' => User::select('id', 'name', 'email', 'is_admin', 'created_at')->get()->toArray(),
+            'users' => User::with('roles:name')->select('id', 'name', 'email', 'created_at')->get()->map(function ($user) {
+                $userData = $user->toArray();
+                $userData['roles'] = $user->roles->pluck('name');
+                return $userData;
+            })->toArray(),
         ];
         
         file_put_contents($backupPath, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
