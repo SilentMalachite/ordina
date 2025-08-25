@@ -117,11 +117,11 @@
             <x-responsive-nav-link :href="route('import.index')" :active="request()->routeIs('import.*')">
                 インポート
             </x-responsive-nav-link>
-            @if(Auth::user()->is_admin)
-                <x-responsive-nav-link :href="route('admin.index')" :active="request()->routeIs('admin.*')">
+            @can('system-manage')
+                <x-responsive-nav-link :href="route('admin.index')" :active="request()->routeIs('admin.*') || request()->routeIs('roles.*')">
                     管理者
                 </x-responsive-nav-link>
-            @endif
+            @endcan
         </div>
 
         <!-- Responsive Settings Options -->

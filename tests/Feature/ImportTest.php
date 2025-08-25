@@ -7,53 +7,58 @@ use App\Models\Product;
 use App\Models\Customer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class ImportTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected $user;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $role = Role::create(['name' => '一般スタッフ']);
+        $permission = Permission::create(['name' => 'import-run']);
+        $role->givePermissionTo($permission);
+
+        $this->user = User::factory()->create();
+        $this->user->assignRole('一般スタッフ');
+    }
+
     public function test_authenticated_user_can_access_import_index()
     {
-        $user = User::factory()->create();
-        
-        $response = $this->actingAs($user)->get('/import');
+        $response = $this->actingAs($this->user)->get('/import');
         $response->assertStatus(200);
         $response->assertSee('データインポート');
     }
 
     public function test_user_can_access_products_import_page()
     {
-        $user = User::factory()->create();
-        
-        $response = $this->actingAs($user)->get('/import/products');
+        $response = $this->actingAs($this->user)->get('/import/products');
         $response->assertStatus(200);
         $response->assertSee('商品データインポート');
     }
 
     public function test_user_can_access_customers_import_page()
     {
-        $user = User::factory()->create();
-        
-        $response = $this->actingAs($user)->get('/import/customers');
+        $response = $this->actingAs($this->user)->get('/import/customers');
         $response->assertStatus(200);
         $response->assertSee('顧客データインポート');
     }
 
     public function test_user_can_access_transactions_import_page()
     {
-        $user = User::factory()->create();
-        
-        $response = $this->actingAs($user)->get('/import/transactions');
+        $response = $this->actingAs($this->user)->get('/import/transactions');
         $response->assertStatus(200);
         $response->assertSee('取引データインポート');
     }
 
     public function test_user_can_download_product_template()
     {
-        $user = User::factory()->create();
-        
-        $response = $this->actingAs($user)->get('/import/template/products');
+        $response = $this->actingAs($this->user)->get('/import/template/products');
         
         $response->assertStatus(200);
         $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
@@ -62,9 +67,7 @@ class ImportTest extends TestCase
 
     public function test_user_can_download_customer_template()
     {
-        $user = User::factory()->create();
-        
-        $response = $this->actingAs($user)->get('/import/template/customers');
+        $response = $this->actingAs($this->user)->get('/import/template/customers');
         
         $response->assertStatus(200);
         $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
@@ -73,9 +76,7 @@ class ImportTest extends TestCase
 
     public function test_user_can_download_transaction_template()
     {
-        $user = User::factory()->create();
-        
-        $response = $this->actingAs($user)->get('/import/template/transactions');
+        $response = $this->actingAs($this->user)->get('/import/template/transactions');
         
         $response->assertStatus(200);
         $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
@@ -84,8 +85,8 @@ class ImportTest extends TestCase
 
     public function test_user_can_import_products_csv()
     {
-        $user = User::factory()->create();
-        
+        \Illuminate\Support\Facades\Queue::fake();
+
         $csvContent = "商品コード,商品名,在庫数,単価,売値,説明\n";
         $csvContent .= "PRD-001,テスト商品1,100,1000,1500,テスト説明1\n";
         $csvContent .= "PRD-002,テスト商品2,50,2000,3000,テスト説明2\n";
@@ -95,24 +96,14 @@ class ImportTest extends TestCase
             $csvContent
         );
         
-        $response = $this->actingAs($user)->post('/import/products', [
+        $response = $this->actingAs($this->user)->post('/import/products', [
             'file' => $file,
             'has_header' => true,
         ]);
         
         $response->assertRedirect();
         $response->assertSessionHas('success');
-        
-        $this->assertDatabaseHas('products', [
-            'product_code' => 'PRD-001',
-            'name' => 'テスト商品1',
-            'stock_quantity' => 100
-        ]);
-        
-        $this->assertDatabaseHas('products', [
-            'product_code' => 'PRD-002',
-            'name' => 'テスト商品2',
-            'stock_quantity' => 50
-        ]);
+
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\ImportProductsFromCsv::class);
     }
 }
