@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\InventoryAdjustment;
+use App\Services\InputSanitizationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -12,12 +13,15 @@ use App\Http\Requests\BulkInventoryAdjustmentRequest;
 
 class InventoryController extends Controller
 {
+    protected InputSanitizationService $sanitizationService;
+
     /**
      * コンストラクタ
      */
     public function __construct()
     {
-        $this->middleware('permission:inventory-list')->only('index', 'adjustments', 'stockAlert');
+        $this->sanitizationService = new InputSanitizationService();
+        $this->middleware('permission:inventory-view')->only('index', 'adjustments', 'stockAlert');
         $this->middleware('permission:inventory-adjust')->only('createAdjustment', 'storeAdjustment', 'bulkAdjustment', 'storeBulkAdjustment');
     }
 
@@ -30,11 +34,13 @@ class InventoryController extends Controller
         }
         
         if ($request->has('search') && $request->search) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('product_code', 'LIKE', "%{$search}%")
-                  ->orWhere('name', 'LIKE', "%{$search}%");
-            });
+            $search = $this->sanitizationService->sanitizeSearchInput($request->search);
+            if (!empty($search)) {
+                $query->where(function($q) use ($search) {
+                    $q->where('product_code', 'LIKE', "%{$search}%")
+                      ->orWhere('name', 'LIKE', "%{$search}%");
+                });
+            }
         }
         
         $products = $query->orderBy('stock_quantity', 'asc')->paginate(20);

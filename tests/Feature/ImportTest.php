@@ -15,7 +15,7 @@ class ImportTest extends TestCase
 
     public function test_authenticated_user_can_access_import_index()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         
         $response = $this->actingAs($user)->get('/import');
         $response->assertStatus(200);
@@ -24,7 +24,7 @@ class ImportTest extends TestCase
 
     public function test_user_can_access_products_import_page()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         
         $response = $this->actingAs($user)->get('/import/products');
         $response->assertStatus(200);
@@ -33,7 +33,7 @@ class ImportTest extends TestCase
 
     public function test_user_can_access_customers_import_page()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         
         $response = $this->actingAs($user)->get('/import/customers');
         $response->assertStatus(200);
@@ -42,7 +42,7 @@ class ImportTest extends TestCase
 
     public function test_user_can_access_transactions_import_page()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         
         $response = $this->actingAs($user)->get('/import/transactions');
         $response->assertStatus(200);
@@ -51,7 +51,7 @@ class ImportTest extends TestCase
 
     public function test_user_can_download_product_template()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         
         $response = $this->actingAs($user)->get('/import/template/products');
         
@@ -62,7 +62,7 @@ class ImportTest extends TestCase
 
     public function test_user_can_download_customer_template()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         
         $response = $this->actingAs($user)->get('/import/template/customers');
         
@@ -73,7 +73,7 @@ class ImportTest extends TestCase
 
     public function test_user_can_download_transaction_template()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         
         $response = $this->actingAs($user)->get('/import/template/transactions');
         
@@ -84,7 +84,7 @@ class ImportTest extends TestCase
 
     public function test_user_can_import_products_csv()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         
         $csvContent = "商品コード,商品名,在庫数,単価,売値,説明\n";
         $csvContent .= "PRD-001,テスト商品1,100,1000,1500,テスト説明1\n";

@@ -6,24 +6,37 @@ use App\Models\Transaction;
 use App\Models\Product;
 use App\Models\Customer;
 use App\Models\ClosingDate;
+use App\Exports\SalesReportExport;
+use App\Exports\InventoryReportExport;
+use App\Exports\CustomerReportExport;
+use App\Exports\ComprehensiveReportExport;
+use App\Services\ErrorHandlingService;
+use App\Services\PerformanceOptimizationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
 use Carbon\Carbon;
 
 class ReportController extends Controller
 {
+    protected $errorService;
+    protected $performanceService;
+
     /**
      * コンストラクタ
      */
     public function __construct()
     {
         $this->middleware('permission:report-view')->only('index', 'salesReport', 'rentalReport', 'inventoryReport', 'customerReport');
-        $this->middleware('permission:report-export')->only('exportSales', 'exportInventory');
+        $this->middleware('permission:report-export')->only('exportSales', 'exportInventory', 'exportCustomer', 'exportComprehensive');
+        $this->errorService = new ErrorHandlingService();
+        $this->performanceService = new PerformanceOptimizationService();
     }
 
     public function index()
     {
-        $closingDates = ClosingDate::orderBy('closing_date', 'desc')->take(12)->get();
+        // closing_dates テーブルに closing_date カラムは無いため、更新日時で並べ替え
+        $closingDates = ClosingDate::orderBy('updated_at', 'desc')->take(12)->get();
         
         return view('reports.index', compact('closingDates'));
     }
@@ -35,21 +48,20 @@ class ReportController extends Controller
         $groupBy = $request->input('group_by', 'daily');
         $customerId = $request->input('customer_id');
         
-        $query = Transaction::with(['product', 'customer'])
-            ->where('type', 'sale')
-            ->whereBetween('transaction_date', [$dateFrom, $dateTo]);
-            
-        if ($customerId) {
-            $query->where('customer_id', $customerId);
-        }
+        $filters = [
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'customer_id' => $customerId
+        ];
         
+        $query = $this->performanceService->getOptimizedReportQuery('sales', $filters);
         $transactions = $query->orderBy('transaction_date', 'desc')->get();
         
         $groupedData = $this->groupTransactionsByPeriod($transactions, $groupBy);
         $productSummary = $this->getProductSummary($transactions);
         $customerSummary = $this->getCustomerSummary($transactions);
         
-        $customers = Customer::orderBy('name')->get();
+        $customers = Customer::select('id', 'name')->orderBy('name')->get();
         
         return view('reports.sales', compact(
             'transactions', 'groupedData', 'productSummary', 
@@ -85,7 +97,7 @@ class ReportController extends Controller
         $productSummary = $this->getProductSummary($transactions);
         $customerSummary = $this->getCustomerSummary($transactions);
         
-        $customers = Customer::orderBy('name')->get();
+        $customers = Customer::select('id', 'name')->orderBy('name')->get();
         
         return view('reports.rentals', compact(
             'transactions', 'groupedData', 'productSummary', 
@@ -149,44 +161,86 @@ class ReportController extends Controller
 
     public function exportSales(Request $request)
     {
-        $dateFrom = $request->input('date_from', now()->startOfMonth()->format('Y-m-d'));
-        $dateTo = $request->input('date_to', now()->format('Y-m-d'));
-        $customerId = $request->input('customer_id');
-        
-        $query = Transaction::with(['product', 'customer'])
-            ->where('type', 'sale')
-            ->whereBetween('transaction_date', [$dateFrom, $dateTo]);
+        $result = $this->errorService->safeDatabaseOperation(function() use ($request) {
+            $dateFrom = $request->input('date_from', now()->startOfMonth()->format('Y-m-d'));
+            $dateTo = $request->input('date_to', now()->format('Y-m-d'));
+            $customerId = $request->input('customer_id');
             
-        if ($customerId) {
-            $query->where('customer_id', $customerId);
+            $filename = 'sales_report_' . $dateFrom . '_to_' . $dateTo . '.xlsx';
+            
+            return Excel::download(
+                new SalesReportExport($dateFrom, $dateTo, $customerId),
+                $filename
+            );
+        }, '売上レポートのExcel出力');
+
+        if ($result['success']) {
+            return $result['data'];
         }
-        
-        $transactions = $query->orderBy('transaction_date', 'desc')->get();
-        
-        return $this->generateCsvResponse($transactions, 'sales_report_' . $dateFrom . '_to_' . $dateTo . '.csv');
+
+        return redirect()->back()->with('error', $result['message']);
     }
 
-    public function exportInventory()
+    public function exportInventory(Request $request)
     {
-        $products = Product::with(['transactions' => function($q) {
-            $q->latest()->take(1);
-        }])->orderBy('name')->get();
-        
-        $data = $products->map(function($product) {
-            return [
-                '商品コード' => $product->product_code,
-                '商品名' => $product->name,
-                '在庫数' => $product->stock_quantity,
-                '単価' => $product->unit_price,
-                '売値' => $product->selling_price,
-                '在庫価値' => $product->stock_quantity * $product->unit_price,
-                '最終取引日' => $product->transactions->first() ? 
-                    $product->transactions->first()->transaction_date->format('Y-m-d') : '',
-                '説明' => $product->description,
-            ];
-        });
-        
-        return $this->generateCsvResponse($data, 'inventory_report_' . now()->format('Y-m-d') . '.csv');
+        $result = $this->errorService->safeDatabaseOperation(function() use ($request) {
+            $lowStockOnly = $request->input('low_stock_only', false);
+            
+            $filename = $lowStockOnly 
+                ? 'low_stock_report_' . now()->format('Y-m-d') . '.xlsx'
+                : 'inventory_report_' . now()->format('Y-m-d') . '.xlsx';
+            
+            return Excel::download(
+                new InventoryReportExport($lowStockOnly),
+                $filename
+            );
+        }, '在庫レポートのExcel出力');
+
+        if ($result['success']) {
+            return $result['data'];
+        }
+
+        return redirect()->back()->with('error', $result['message']);
+    }
+
+    public function exportCustomer()
+    {
+        $result = $this->errorService->safeDatabaseOperation(function() {
+            $filename = 'customer_report_' . now()->format('Y-m-d') . '.xlsx';
+            
+            return Excel::download(
+                new CustomerReportExport(),
+                $filename
+            );
+        }, '顧客レポートのExcel出力');
+
+        if ($result['success']) {
+            return $result['data'];
+        }
+
+        return redirect()->back()->with('error', $result['message']);
+    }
+
+    public function exportComprehensive(Request $request)
+    {
+        $result = $this->errorService->safeDatabaseOperation(function() use ($request) {
+            $dateFrom = $request->input('date_from', now()->startOfMonth()->format('Y-m-d'));
+            $dateTo = $request->input('date_to', now()->format('Y-m-d'));
+            $customerId = $request->input('customer_id');
+            
+            $filename = 'comprehensive_report_' . $dateFrom . '_to_' . $dateTo . '.xlsx';
+            
+            return Excel::download(
+                new ComprehensiveReportExport($dateFrom, $dateTo, $customerId),
+                $filename
+            );
+        }, '総合レポートのExcel出力');
+
+        if ($result['success']) {
+            return $result['data'];
+        }
+
+        return redirect()->back()->with('error', $result['message']);
     }
 
     private function groupTransactionsByPeriod($transactions, $groupBy)

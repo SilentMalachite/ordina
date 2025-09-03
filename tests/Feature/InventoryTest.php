@@ -14,7 +14,7 @@ class InventoryTest extends TestCase
 
     public function test_authenticated_user_can_access_inventory_index()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         Product::factory()->count(5)->create();
         
         $response = $this->actingAs($user)->get('/inventory');
@@ -25,7 +25,7 @@ class InventoryTest extends TestCase
 
     public function test_user_can_create_inventory_adjustment()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         $product = Product::factory()->create(['stock_quantity' => 10]);
         
         $response = $this->actingAs($user)->get('/inventory/adjustment/create');
@@ -51,7 +51,7 @@ class InventoryTest extends TestCase
 
     public function test_user_can_view_adjustment_history()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         $product = Product::factory()->create();
         
         InventoryAdjustment::factory()->count(3)->create([

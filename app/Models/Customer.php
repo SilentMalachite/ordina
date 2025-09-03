@@ -20,6 +20,19 @@ class Customer extends Model
         'notes',
     ];
 
+    /**
+     * コンストラクタ
+     */
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+
+        // HasSyncableFieldsトレイトの初期化メソッドを呼び出し
+        if (method_exists($this, 'initializeHasSyncableFields')) {
+            $this->initializeHasSyncableFields();
+        }
+    }
+
     public function transactions()
     {
         return $this->hasMany(Transaction::class);

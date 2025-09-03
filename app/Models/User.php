@@ -58,6 +58,8 @@ class User extends Authenticatable
 
     public function isAdmin()
     {
-        return $this->is_admin;
+        // 統一された権限管理サービスを使用
+        $permissionService = app(\App\Services\PermissionService::class);
+        return $permissionService->isAdmin($this);
     }
 }

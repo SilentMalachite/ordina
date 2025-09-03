@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\SyncDataRequest;
 use App\Models\Product;
 use App\Models\Customer;
 use App\Models\Transaction;
@@ -64,13 +65,9 @@ class SyncController extends Controller
     /**
      * ローカルの変更をサーバーに送信（Push）
      */
-    public function push(Request $request)
+    public function push(SyncDataRequest $request)
     {
-        $request->validate([
-            'data' => 'required|array',
-            'data.*.table' => 'required|string|in:products,customers,transactions,inventory_adjustments',
-            'data.*.records' => 'required|array'
-        ]);
+        // SyncDataRequestで検証済みのデータを取得
 
         $results = [];
         $conflicts = [];

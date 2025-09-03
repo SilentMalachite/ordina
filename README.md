@@ -99,6 +99,42 @@ php artisan native:serve
 - **認証**: Laravel Breeze
 - **Excel処理**: Laravel Excel
 
+## 設定の概要
+
+- `config/ordina.php`: Ordina固有の設定を集約
+  - `default_closing_day`: 締め日の既定値（ENV: `ORDINA_DEFAULT_CLOSING_DAY`）
+  - `low_stock_threshold`: 低在庫のしきい値（ENV: `ORDINA_LOW_STOCK_THRESHOLD`）
+  - `excel_export_path`: Excel出力先（ENV: `ORDINA_EXCEL_EXPORT_PATH`）
+  - `backup_path`: バックアップ保存先（ENV: `ORDINA_BACKUP_PATH`）
+  - `max_backup_files`: バックアップ保持数（ENV: `ORDINA_MAX_BACKUP_FILES`）
+  - `max_log_files` / `max_log_size`: ログローテーション設定（ENV: `ORDINA_MAX_LOG_FILES`, `ORDINA_MAX_LOG_SIZE`）
+
+注意: `.env` は既定で本番向けに `APP_DEBUG=false` です。
+
+## 権限とロール
+
+- 権限（抜粋）
+  - 商品: `product-list`, `product-create`, `product-edit`, `product-delete`
+  - 在庫: `inventory-view`, `inventory-adjust`, `inventory-bulk-adjust`
+  - 顧客: `customer-list`, `customer-create`, `customer-edit`, `customer-delete`
+  - 取引: `transaction-list`, `transaction-create`, `transaction-edit`, `transaction-delete`, `transaction-return`
+  - レポート: `report-view`, `report-export`
+  - インポート: `import-run`
+  - システム: `system-manage`, `user-manage`, `role-manage`, `closing-date-manage`
+  - ログ/バックアップ: `log-view`, `log-manage`, `backup-view`, `backup-manage`
+  - 同期: `sync-conflicts-view`, `sync-conflicts-resolve`
+  - APIトークン: `api-token-view`, `api-token-create`, `api-token-edit`, `api-token-delete`
+
+- 代表ロール
+  - 管理者: 全権限（Gate::before でも全許可）
+  - マネージャー: 管理以外の大半 + ログ/バックアップ閲覧
+  - 一般ユーザー: 閲覧 + 作成/更新中心（インポート含む）
+  - 閲覧者: 一覧/閲覧のみ
+
+権限の初期化: `php artisan db:seed --class=RolesAndPermissionsSeeder`
+
+移行メモ: 旧 `inventory-list` は `inventory-view` に統一されました。
+
 ## 開発
 
 ### ディレクトリ構造
@@ -141,3 +177,8 @@ php artisan test
 
 - Laravel - The PHP Framework for Web Artisans
 - NativePHP - Build native desktop applications using PHP
+
+## セキュリティ注記
+
+- バックアップに `.env` は含みません。管理画面からのダウンロードは安全なファイル名・パスのみ許可します（拡張子制限 + 実パス検証）。
+- APIトークンは `Authorization: Bearer <token>` での利用を推奨します（クエリ/フォームでの指定は将来廃止予定）。

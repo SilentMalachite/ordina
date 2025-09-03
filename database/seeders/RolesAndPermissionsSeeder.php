@@ -36,10 +36,12 @@ class RolesAndPermissionsSeeder extends Seeder
             'transaction-create',
             'transaction-edit',
             'transaction-delete',
+            'transaction-return',
             
             // 在庫管理
-            'inventory-list',
+            'inventory-view',
             'inventory-adjust',
+            'inventory-bulk-adjust',
             
             // レポート
             'report-view',
@@ -53,6 +55,22 @@ class RolesAndPermissionsSeeder extends Seeder
             'user-manage',
             'role-manage',
             'closing-date-manage',
+
+            // ログ・バックアップ
+            'log-view',
+            'log-manage',
+            'backup-view',
+            'backup-manage',
+
+            // 同期管理
+            'sync-conflicts-view',
+            'sync-conflicts-resolve',
+
+            // APIトークン管理
+            'api-token-view',
+            'api-token-create',
+            'api-token-edit',
+            'api-token-delete',
         ];
 
         foreach ($permissions as $permission) {
@@ -67,7 +85,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'product-list',
             'customer-list',
             'transaction-list',
-            'inventory-list',
+            'inventory-view',
             'report-view'
         ]);
 
@@ -76,13 +94,19 @@ class RolesAndPermissionsSeeder extends Seeder
         $staff->givePermissionTo([
             'product-list',
             'product-create',
+            'product-edit',
             'customer-list',
             'customer-create',
+            'customer-edit',
             'transaction-list',
             'transaction-create',
-            'inventory-list',
+            'transaction-edit',
+            'transaction-return',
+            'inventory-view',
             'inventory-adjust',
-            'report-view'
+            'report-view',
+            'report-export',
+            'import-run'
         ]);
 
         // マネージャーロール
@@ -100,11 +124,20 @@ class RolesAndPermissionsSeeder extends Seeder
             'transaction-create',
             'transaction-edit',
             'transaction-delete',
-            'inventory-list',
+            'transaction-return',
+            'inventory-view',
             'inventory-adjust',
+            'inventory-bulk-adjust',
             'report-view',
             'report-export',
-            'import-run'
+            'import-run',
+            // ログ・バックアップの閲覧権限のみ
+            'log-view',
+            'backup-view',
+            // 同期競合の閲覧権限
+            'sync-conflicts-view',
+            // APIトークン閲覧権限
+            'api-token-view',
         ]);
 
         // 管理者ロール（全権限はAuthServiceProviderで処理）

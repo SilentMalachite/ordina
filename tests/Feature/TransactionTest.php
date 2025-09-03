@@ -15,7 +15,7 @@ class TransactionTest extends TestCase
 
     public function test_authenticated_user_can_access_transactions_index()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         $customer = Customer::factory()->create();
         $product = Product::factory()->create();
         Transaction::factory()->count(5)->create([
@@ -31,7 +31,7 @@ class TransactionTest extends TestCase
 
     public function test_user_can_create_sale_transaction()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         $customer = Customer::factory()->create();
         $product = Product::factory()->create([
             'stock_quantity' => 100,
@@ -69,7 +69,7 @@ class TransactionTest extends TestCase
 
     public function test_user_can_create_rental_transaction()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         $customer = Customer::factory()->create();
         $product = Product::factory()->create([
             'stock_quantity' => 50,
@@ -104,7 +104,7 @@ class TransactionTest extends TestCase
 
     public function test_user_can_return_rental_item()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         $customer = Customer::factory()->create();
         $product = Product::factory()->create(['stock_quantity' => 50]);
         

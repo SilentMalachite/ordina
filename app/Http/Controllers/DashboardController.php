@@ -32,7 +32,10 @@ class DashboardController extends Controller
                 ->take(5)
                 ->get(),
             'total_revenue' => Transaction::where('type', 'sale')
-                ->sum(DB::raw('quantity * unit_price')),
+                ->get()
+                ->sum(function ($transaction) {
+                    return $transaction->quantity * $transaction->unit_price;
+                }),
         ];
 
         return view('dashboard.admin', compact('stats'));

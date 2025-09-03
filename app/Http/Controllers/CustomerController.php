@@ -4,12 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\Transaction;
+use App\Services\InputSanitizationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 
 class CustomerController extends Controller
 {
+    protected InputSanitizationService $sanitizationService;
+
     /**
      * コンストラクタ
      */
@@ -20,6 +23,8 @@ class CustomerController extends Controller
         $this->middleware('permission:customer-edit')->only('edit', 'update');
         $this->middleware('permission:customer-delete')->only('destroy');
         $this->middleware('permission:transaction-create')->only('returnItem');
+
+        $this->sanitizationService = new InputSanitizationService();
     }
 
     public function index(Request $request)
@@ -27,12 +32,14 @@ class CustomerController extends Controller
         $query = Customer::query();
         
         if ($request->has('search') && $request->search) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'LIKE', "%{$search}%")
-                  ->orWhere('email', 'LIKE', "%{$search}%")
-                  ->orWhere('phone', 'LIKE', "%{$search}%");
-            });
+            $search = $this->sanitizationService->sanitizeSearchInput($request->search);
+            if (!empty($search)) {
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'LIKE', "%{$search}%")
+                      ->orWhere('email', 'LIKE', "%{$search}%")
+                      ->orWhere('phone', 'LIKE', "%{$search}%");
+                });
+            }
         }
         
         if ($request->has('type') && $request->type) {
@@ -82,15 +89,17 @@ class CustomerController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(10);
             
-        $statistics = DB::table('transactions')
-            ->where('customer_id', $customer->id)
-            ->selectRaw('
-                COUNT(*) as total_transactions,
-                SUM(CASE WHEN type = "sale" THEN quantity * unit_price ELSE 0 END) as total_sales,
-                COUNT(CASE WHEN type = "rental" THEN 1 END) as total_rentals,
-                COUNT(CASE WHEN type = "rental" AND returned_at IS NULL THEN 1 END) as pending_returns
-            ')
-            ->first();
+        $transactions = $customer->transactions;
+
+        $statistics = [
+            'total_transactions' => $transactions->count(),
+            'total_sales' => $transactions->where('type', 'sale')->sum(function ($transaction) {
+                return $transaction->quantity * $transaction->unit_price;
+            }),
+            'total_rentals' => $transactions->where('type', 'rental')->count(),
+            'pending_returns' => $transactions->where('type', 'rental')
+                ->whereNull('returned_at')->count(),
+        ];
         
         return view('customers.show', compact('customer', 'transactions', 'statistics'));
     }
@@ -139,18 +148,18 @@ class CustomerController extends Controller
 
     public function search(Request $request)
     {
-        $query = $request->get('q');
-        
+        $query = $this->sanitizationService->sanitizeSearchInput($request->get('q', ''));
+
         if (!$query) {
             return response()->json([]);
         }
-        
+
         $customers = Customer::where('name', 'LIKE', "%{$query}%")
             ->orWhere('email', 'LIKE', "%{$query}%")
             ->select('id', 'name', 'type', 'email', 'phone')
             ->limit(10)
             ->get();
-            
+
         return response()->json($customers);
     }
 

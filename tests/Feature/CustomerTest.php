@@ -13,7 +13,7 @@ class CustomerTest extends TestCase
 
     public function test_authenticated_user_can_access_customers_index()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         Customer::factory()->count(5)->create();
         
         $response = $this->actingAs($user)->get('/customers');
@@ -23,7 +23,7 @@ class CustomerTest extends TestCase
 
     public function test_user_can_create_customer()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         
         $response = $this->actingAs($user)->get('/customers/create');
         $response->assertStatus(200);
@@ -48,7 +48,7 @@ class CustomerTest extends TestCase
 
     public function test_user_can_update_customer()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         $customer = Customer::factory()->create();
         
         $response = $this->actingAs($user)->get("/customers/{$customer->id}/edit");

@@ -19,6 +19,19 @@ class Product extends Model
         'description',
     ];
 
+    /**
+     * コンストラクタ
+     */
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+
+        // HasSyncableFieldsトレイトの初期化メソッドを呼び出し
+        if (method_exists($this, 'initializeHasSyncableFields')) {
+            $this->initializeHasSyncableFields();
+        }
+    }
+
     protected $casts = [
         'unit_price' => 'decimal:2',
         'selling_price' => 'decimal:2',

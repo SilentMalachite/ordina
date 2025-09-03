@@ -5,9 +5,13 @@ namespace App\Providers;
 use Native\Laravel\Facades\Window;
 use Native\Laravel\Facades\Menu;
 use Native\Laravel\Facades\MenuBar;
+use Native\Laravel\Facades\Notification;
 use Native\Laravel\Menu\Menu as MenuMenu;
 use Native\Laravel\Contracts\ProvidesPhpIni;
 use Native\Laravel\Facades\Process;
+use App\Services\DesktopNotificationService;
+use App\Services\DesktopFileService;
+use App\Services\DesktopWindowService;
 
 class NativeAppServiceProvider implements ProvidesPhpIni
 {
@@ -22,10 +26,12 @@ class NativeAppServiceProvider implements ProvidesPhpIni
             ->width(1200)
             ->height(800)
             ->minWidth(800)
-            ->minHeight(600);
+            ->minHeight(600)
+            ->center();
 
         $this->setupMenu();
         $this->startQueueWorker();
+        $this->scheduleNotifications();
     }
 
     /**
@@ -79,6 +85,10 @@ class NativeAppServiceProvider implements ProvidesPhpIni
             ->submenu('ウィンドウ', MenuMenu::new()
                 ->minimize()
                 ->close()
+                ->separator()
+                ->link('products/create', '新規商品登録', 'CmdOrCtrl+Shift+P')
+                ->link('customers/create', '新規顧客登録', 'CmdOrCtrl+Shift+C')
+                ->link('transactions/create', '新規取引登録', 'CmdOrCtrl+Shift+T')
             )
             ->register();
     }
@@ -92,6 +102,17 @@ class NativeAppServiceProvider implements ProvidesPhpIni
     }
 
     /**
+     * Schedule desktop notifications
+     */
+    protected function scheduleNotifications(): void
+    {
+        // 起動時のウェルカム通知
+        Notification::title('Ordina 起動完了')
+            ->message('在庫管理システムが正常に起動しました。')
+            ->show();
+    }
+
+    /**
      * Return an array of php.ini directives to be set.
      */
     public function phpIni(): array
@@ -100,6 +121,9 @@ class NativeAppServiceProvider implements ProvidesPhpIni
             'memory_limit' => '512M',
             'max_execution_time' => '0',
             'max_input_time' => '0',
+            'upload_max_filesize' => '50M',
+            'post_max_size' => '50M',
+            'max_file_uploads' => '20',
         ];
     }
 }

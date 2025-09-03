@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Transaction;
 use App\Models\Product;
 use App\Models\Customer;
+use App\Services\PerformanceOptimizationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -27,7 +28,9 @@ class TransactionController extends Controller
 
     public function index(Request $request)
     {
-        $query = Transaction::with(['product', 'customer', 'user']);
+        $performanceService = new PerformanceOptimizationService();
+        
+        $query = $performanceService->getOptimizedTransactions();
         
         if ($request->has('type') && $request->type) {
             $query->where('type', $request->type);
@@ -50,8 +53,8 @@ class TransactionController extends Controller
         }
         
         $transactions = $query->orderBy('transaction_date', 'desc')->paginate(20);
-        $customers = Customer::orderBy('name')->get();
-        $products = Product::orderBy('name')->get();
+        $customers = Customer::select('id', 'name')->orderBy('name')->get();
+        $products = Product::select('id', 'name')->orderBy('name')->get();
         
         return view('transactions.index', compact('transactions', 'customers', 'products'));
     }
@@ -241,7 +244,10 @@ class TransactionController extends Controller
         $sales = $query->orderBy('transaction_date', 'desc')->paginate(20);
         
         $totalSales = Transaction::where('type', 'sale')
-            ->sum(DB::raw('quantity * unit_price'));
+            ->get()
+            ->sum(function ($transaction) {
+                return $transaction->quantity * $transaction->unit_price;
+            });
             
         return view('transactions.sales', compact('sales', 'totalSales'));
     }

@@ -3,11 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Services\ErrorHandlingService;
+use App\Services\InputSanitizationService;
+use App\Exceptions\DataNotFoundException;
+use App\Exceptions\PermissionDeniedException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
+    protected InputSanitizationService $sanitizationService;
+
     /**
      * コンストラクタ
      */
@@ -17,6 +23,8 @@ class ProductController extends Controller
         $this->middleware('permission:product-create')->only('create', 'store');
         $this->middleware('permission:product-edit')->only('edit', 'update');
         $this->middleware('permission:product-delete')->only('destroy');
+
+        $this->sanitizationService = new InputSanitizationService();
     }
 
     public function index(Request $request)
@@ -24,11 +32,13 @@ class ProductController extends Controller
         $query = Product::query();
         
         if ($request->has('search') && $request->search) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('product_code', 'LIKE', "%{$search}%")
-                  ->orWhere('name', 'LIKE', "%{$search}%");
-            });
+            $search = $this->sanitizationService->sanitizeSearchInput($request->search);
+            if (!empty($search)) {
+                $query->where(function($q) use ($search) {
+                    $q->where('product_code', 'LIKE', "%{$search}%")
+                      ->orWhere('name', 'LIKE', "%{$search}%");
+                });
+            }
         }
         
         $products = $query->orderBy('created_at', 'desc')->paginate(20);
@@ -66,13 +76,17 @@ class ProductController extends Controller
 
     public function show(Product $product)
     {
-        $recentTransactions = $product->transactions()
-            ->with('customer')
-            ->latest()
-            ->take(10)
-            ->get();
-            
-        return view('products.show', compact('product', 'recentTransactions'));
+        $errorService = new ErrorHandlingService();
+        
+        return $errorService->safeDatabaseOperation(function() use ($product) {
+            $recentTransactions = $product->transactions()
+                ->with('customer')
+                ->latest()
+                ->take(10)
+                ->get();
+                
+            return view('products.show', compact('product', 'recentTransactions'));
+        }, '商品詳細の取得');
     }
 
     public function edit(Product $product)
@@ -105,26 +119,41 @@ class ProductController extends Controller
 
     public function destroy(Product $product)
     {
-        $product->delete();
+        $errorService = new ErrorHandlingService();
+        
+        $result = $errorService->safeDatabaseOperation(function() use ($product) {
+            // 関連する取引があるかチェック
+            if ($product->transactions()->exists()) {
+                throw new \Exception('この商品には関連する取引データがあるため削除できません。');
+            }
+            
+            $product->delete();
+            return true;
+        }, '商品の削除');
 
-        return redirect()->route('products.index')
-            ->with('success', '商品が正常に削除されました。');
+        if ($result['success']) {
+            return redirect()->route('products.index')
+                ->with('success', '商品が正常に削除されました。');
+        } else {
+            return redirect()->back()
+                ->with('error', $result['message']);
+        }
     }
 
     public function search(Request $request)
     {
-        $query = $request->get('q');
-        
+        $query = $this->sanitizationService->sanitizeSearchInput($request->get('q', ''));
+
         if (!$query) {
             return response()->json([]);
         }
-        
+
         $products = Product::where('product_code', 'LIKE', "%{$query}%")
             ->orWhere('name', 'LIKE', "%{$query}%")
             ->select('id', 'product_code', 'name', 'stock_quantity', 'selling_price')
             ->limit(10)
             ->get();
-            
+
         return response()->json($products);
     }
 }

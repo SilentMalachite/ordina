@@ -20,6 +20,19 @@ class InventoryAdjustment extends Model
         'reason',
     ];
 
+    /**
+     * コンストラクタ
+     */
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+
+        // HasSyncableFieldsトレイトの初期化メソッドを呼び出し
+        if (method_exists($this, 'initializeHasSyncableFields')) {
+            $this->initializeHasSyncableFields();
+        }
+    }
+
     public function product()
     {
         return $this->belongsTo(Product::class);

@@ -41,6 +41,16 @@
                             管理者
                         </x-nav-link>
                     @endcan
+                    @can('log-view')
+                        <x-nav-link :href="route('admin.logs.page')" :active="request()->routeIs('admin.logs.page')">
+                            ログ管理
+                        </x-nav-link>
+                    @endcan
+                    @can('backup-view')
+                        <x-nav-link :href="route('admin.backups.page')" :active="request()->routeIs('admin.backups.page')">
+                            バックアップ
+                        </x-nav-link>
+                    @endcan
                 </div>
             </div>
 
@@ -122,6 +132,16 @@
                     管理者
                 </x-responsive-nav-link>
             @endif
+            @can('log-view')
+                <x-responsive-nav-link :href="route('admin.logs.page')" :active="request()->routeIs('admin.logs.page')">
+                    ログ管理
+                </x-responsive-nav-link>
+            @endcan
+            @can('backup-view')
+                <x-responsive-nav-link :href="route('admin.backups.page')" :active="request()->routeIs('admin.backups.page')">
+                    バックアップ
+                </x-responsive-nav-link>
+            @endcan
         </div>
 
         <!-- Responsive Settings Options -->

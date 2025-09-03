@@ -16,7 +16,7 @@ class ReportTest extends TestCase
 
     public function test_authenticated_user_can_access_reports_index()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         ClosingDate::factory()->count(3)->create();
         
         $response = $this->actingAs($user)->get('/reports');
@@ -26,7 +26,7 @@ class ReportTest extends TestCase
 
     public function test_user_can_access_sales_report()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         $customer = Customer::factory()->create();
         $product = Product::factory()->create();
         
@@ -44,7 +44,7 @@ class ReportTest extends TestCase
 
     public function test_user_can_access_rental_report()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         $customer = Customer::factory()->create();
         $product = Product::factory()->create();
         
@@ -61,7 +61,7 @@ class ReportTest extends TestCase
 
     public function test_user_can_access_inventory_report()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         Product::factory()->count(10)->create();
         
         $response = $this->actingAs($user)->get('/reports/inventory');
@@ -71,7 +71,7 @@ class ReportTest extends TestCase
 
     public function test_user_can_access_customer_report()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         $customers = Customer::factory()->count(5)->create();
         
         foreach ($customers as $customer) {
@@ -88,7 +88,7 @@ class ReportTest extends TestCase
 
     public function test_user_can_export_sales_report()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         $customer = Customer::factory()->create();
         $product = Product::factory()->create();
         
@@ -101,19 +101,19 @@ class ReportTest extends TestCase
         $response = $this->actingAs($user)->get('/reports/export/sales');
         
         $response->assertStatus(200);
-        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+        $response->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         $response->assertHeader('Content-Disposition');
     }
 
     public function test_user_can_export_inventory_report()
     {
-        $user = User::factory()->create();
+        $user = $this->createUserWithRole('一般スタッフ');
         Product::factory()->count(5)->create();
         
         $response = $this->actingAs($user)->get('/reports/export/inventory');
         
         $response->assertStatus(200);
-        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+        $response->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         $response->assertHeader('Content-Disposition');
     }
 }

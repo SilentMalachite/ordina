@@ -6,6 +6,8 @@ use App\Models\Product;
 use App\Models\Customer;
 use App\Models\Transaction;
 use App\Models\InventoryAdjustment;
+use App\Models\SyncConflict;
+use App\Models\ApiToken;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -46,10 +48,23 @@ class SyncLocalChangesToServerJob implements ShouldQueue
         try {
             // サーバーのエンドポイント（環境設定から取得）
             $serverUrl = config('sync.server_url', 'https://api.ordina.example.com');
-            $apiToken = config('sync.api_token');
+
+            // 有効なAPIトークンを取得（同期権限を持つもの）
+            $apiToken = $this->getValidApiToken();
+
+            if (!$apiToken) {
+                Log::error('No valid API token found for sync', [
+                    'user_id' => $this->userId,
+                ]);
+
+                throw new \Exception('有効なAPIトークンが見つかりません');
+            }
+
+            // トークンの使用を記録
+            $apiToken->recordUsage();
 
             // データをサーバーに送信
-            $response = Http::withToken($apiToken)
+            $response = Http::withToken($apiToken->token)
                 ->timeout(30)
                 ->post($serverUrl . '/api/sync/push', [
                     'data' => $syncData
@@ -94,13 +109,13 @@ class SyncLocalChangesToServerJob implements ShouldQueue
     }
 
     /**
-     * 未同期データを収集
+     * 未同期データを収集（ユーザー固有）
      */
     private function collectUnsyncedData(): array
     {
         $data = [];
-        
-        // 商品の未同期データ
+
+        // 商品の未同期データ（全ユーザーのデータを同期）
         $unsyncedProducts = Product::unsyncedRecords()->get();
         if ($unsyncedProducts->isNotEmpty()) {
             $data[] = [
@@ -108,8 +123,8 @@ class SyncLocalChangesToServerJob implements ShouldQueue
                 'records' => $unsyncedProducts->toArray()
             ];
         }
-        
-        // 顧客の未同期データ
+
+        // 顧客の未同期データ（全ユーザーのデータを同期）
         $unsyncedCustomers = Customer::unsyncedRecords()->get();
         if ($unsyncedCustomers->isNotEmpty()) {
             $data[] = [
@@ -117,25 +132,29 @@ class SyncLocalChangesToServerJob implements ShouldQueue
                 'records' => $unsyncedCustomers->toArray()
             ];
         }
-        
-        // 取引の未同期データ
-        $unsyncedTransactions = Transaction::unsyncedRecords()->get();
+
+        // 取引の未同期データ（特定のユーザーのみ）
+        $unsyncedTransactions = Transaction::unsyncedRecords()
+            ->where('user_id', $this->userId)
+            ->get();
         if ($unsyncedTransactions->isNotEmpty()) {
             $data[] = [
                 'table' => 'transactions',
                 'records' => $unsyncedTransactions->toArray()
             ];
         }
-        
-        // 在庫調整の未同期データ
-        $unsyncedAdjustments = InventoryAdjustment::unsyncedRecords()->get();
+
+        // 在庫調整の未同期データ（特定のユーザーのみ）
+        $unsyncedAdjustments = InventoryAdjustment::unsyncedRecords()
+            ->where('user_id', $this->userId)
+            ->get();
         if ($unsyncedAdjustments->isNotEmpty()) {
             $data[] = [
                 'table' => 'inventory_adjustments',
                 'records' => $unsyncedAdjustments->toArray()
             ];
         }
-        
+
         return $data;
     }
 
@@ -186,20 +205,107 @@ class SyncLocalChangesToServerJob implements ShouldQueue
      */
     private function handleConflicts(array $conflicts): void
     {
-        // 競合情報をセッションまたはデータベースに保存
-        // ユーザーに競合解決UIを表示するため
-        
+        $conflictCount = 0;
+
         foreach ($conflicts as $conflict) {
-            Log::warning('Sync conflict detected', [
-                'table' => $conflict['table'],
-                'uuid' => $conflict['uuid'],
-                'resolution_strategy' => $conflict['resolution_strategy']
-            ]);
+            try {
+                // 競合情報をデータベースに保存
+                $this->storeConflict($conflict);
+                $conflictCount++;
+
+                Log::warning('Sync conflict detected and stored', [
+                    'table' => $conflict['table'],
+                    'uuid' => $conflict['uuid'],
+                    'resolution_strategy' => $conflict['resolution_strategy'] ?? 'manual'
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Failed to store conflict', [
+                    'conflict' => $conflict,
+                    'error' => $e->getMessage()
+                ]);
+            }
         }
-        
-        // 競合があることを通知
-        Notification::title('同期の競合が発生')
-            ->message(count($conflicts) . '件の競合が検出されました。確認してください。')
-            ->show();
+
+        if ($conflictCount > 0) {
+            // 競合があることを通知
+            Notification::title('同期の競合が発生')
+                ->message($conflictCount . '件の競合が検出されました。同期メニューから解決してください。')
+                ->show();
+
+            Log::info('Conflicts stored for manual resolution', ['count' => $conflictCount]);
+        }
+    }
+
+    /**
+     * 競合情報をデータベースに保存
+     */
+    private function storeConflict(array $conflict): void
+    {
+        // ローカルのデータを取得
+        $localData = $this->getLocalRecordData($conflict['table'], $conflict['uuid']);
+
+        SyncConflict::create([
+            'table_name' => $conflict['table'],
+            'record_uuid' => $conflict['uuid'],
+            'local_data' => $localData,
+            'server_data' => $conflict['server_data'] ?? [],
+            'resolution_strategy' => $conflict['resolution_strategy'] ?? null,
+            'conflict_reason' => $conflict['reason'] ?? 'データがローカルとサーバーで競合しています',
+            'user_id' => $this->userId,
+        ]);
+    }
+
+    /**
+     * ローカルのレコードデータを取得
+     */
+    private function getLocalRecordData(string $table, string $uuid): array
+    {
+        $modelClass = $this->getModelClassForTable($table);
+
+        if (!$modelClass) {
+            return [];
+        }
+
+        $record = $modelClass::where('uuid', $uuid)->first();
+
+        return $record ? $record->toArray() : [];
+    }
+
+    /**
+     * テーブル名からモデルクラスを取得
+     */
+    private function getModelClassForTable(string $table): ?string
+    {
+        return match ($table) {
+            'products' => Product::class,
+            'customers' => Customer::class,
+            'transactions' => Transaction::class,
+            'inventory_adjustments' => InventoryAdjustment::class,
+            default => null,
+        };
+    }
+
+    /**
+     * 有効なAPIトークンを取得
+     */
+    private function getValidApiToken(): ?ApiToken
+    {
+        // まず、現在のユーザーの有効なAPIトークンを検索
+        $userToken = ApiToken::where('user_id', $this->userId)
+            ->valid()
+            ->whereJsonContains('abilities', 'sync')
+            ->first();
+
+        if ($userToken) {
+            return $userToken;
+        }
+
+        // ユーザートークンが見つからない場合、システム全体の同期用トークンを検索
+        $systemToken = ApiToken::valid()
+            ->whereJsonContains('abilities', 'sync')
+            ->whereJsonContains('abilities', 'system')
+            ->first();
+
+        return $systemToken;
     }
 }

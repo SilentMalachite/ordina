@@ -58,8 +58,12 @@ Route::middleware('auth')->group(function () {
     Route::get('reports/rentals', [App\Http\Controllers\ReportController::class, 'rentalReport'])->name('reports.rentals');
     Route::get('reports/inventory', [App\Http\Controllers\ReportController::class, 'inventoryReport'])->name('reports.inventory');
     Route::get('reports/customers', [App\Http\Controllers\ReportController::class, 'customerReport'])->name('reports.customers');
+    
+    // Excel出力
     Route::get('reports/export/sales', [App\Http\Controllers\ReportController::class, 'exportSales'])->name('reports.export.sales');
     Route::get('reports/export/inventory', [App\Http\Controllers\ReportController::class, 'exportInventory'])->name('reports.export.inventory');
+    Route::get('reports/export/customers', [App\Http\Controllers\ReportController::class, 'exportCustomer'])->name('reports.export.customers');
+    Route::get('reports/export/comprehensive', [App\Http\Controllers\ReportController::class, 'exportComprehensive'])->name('reports.export.comprehensive');
 
     // インポート
     Route::get('import', [App\Http\Controllers\ImportController::class, 'index'])->name('import.index');
@@ -75,8 +79,22 @@ Route::middleware('auth')->group(function () {
     Route::get('job-statuses', [App\Http\Controllers\JobStatusController::class, 'index'])->name('job-statuses.index');
     Route::get('job-statuses/{jobStatus}', [App\Http\Controllers\JobStatusController::class, 'show'])->name('job-statuses.show');
 
+    // 締め処理
+    Route::get('closing', [App\Http\Controllers\ClosingController::class, 'index'])->name('closing.index');
+    Route::post('closing/process', [App\Http\Controllers\ClosingController::class, 'process'])->name('closing.process');
+    Route::get('closing/show', [App\Http\Controllers\ClosingController::class, 'show'])->name('closing.show');
+    Route::get('closing/history', [App\Http\Controllers\ClosingController::class, 'history'])->name('closing.history');
+
+    // 在庫アラート
+    Route::get('stock-alerts', [App\Http\Controllers\StockAlertController::class, 'index'])->name('stock-alerts.index');
+    Route::get('stock-alerts/settings', [App\Http\Controllers\StockAlertController::class, 'settings'])->name('stock-alerts.settings');
+    Route::post('stock-alerts/settings', [App\Http\Controllers\StockAlertController::class, 'updateSettings'])->name('stock-alerts.update-settings');
+    Route::post('stock-alerts/run-check', [App\Http\Controllers\StockAlertController::class, 'runCheck'])->name('stock-alerts.run-check');
+    Route::get('stock-alerts/history', [App\Http\Controllers\StockAlertController::class, 'history'])->name('stock-alerts.history');
+    Route::get('stock-alerts/statistics', [App\Http\Controllers\StockAlertController::class, 'statistics'])->name('stock-alerts.statistics');
+
     // 管理者機能
-    Route::middleware(['auth', 'role:管理者'])->group(function () {
+    Route::middleware(['auth', 'permission:system-manage'])->group(function () {
         Route::get('admin', [App\Http\Controllers\AdminController::class, 'index'])->name('admin.index');
         Route::get('admin/users', [App\Http\Controllers\AdminController::class, 'users'])->name('admin.users');
         Route::get('admin/users/create', [App\Http\Controllers\AdminController::class, 'createUser'])->name('admin.users.create');
@@ -95,8 +113,55 @@ Route::middleware('auth')->group(function () {
         Route::get('admin/system-logs', [App\Http\Controllers\AdminController::class, 'systemLogs'])->name('admin.system-logs');
         Route::get('admin/backup/download/{filename}', [App\Http\Controllers\AdminController::class, 'downloadBackup'])->name('admin.backup.download');
         
+        // ログ管理 UI
+        Route::get('admin/logs', [App\Http\Controllers\Admin\LogUIController::class, 'index'])->name('admin.logs.page');
+
+        // ログ管理（JSON API）
+        Route::prefix('admin/logs')->group(function () {
+            Route::get('files', [App\Http\Controllers\Admin\LogManagementController::class, 'files'])->name('admin.logs.files');
+            Route::get('{filename}', [App\Http\Controllers\Admin\LogManagementController::class, 'show'])->name('admin.logs.show');
+            Route::get('statistics/summary', [App\Http\Controllers\Admin\LogManagementController::class, 'statistics'])->name('admin.logs.statistics');
+            Route::get('levels/errors', [App\Http\Controllers\Admin\LogManagementController::class, 'errors'])->name('admin.logs.errors');
+            Route::get('levels/warnings', [App\Http\Controllers\Admin\LogManagementController::class, 'warnings'])->name('admin.logs.warnings');
+            Route::post('{filename}/clear', [App\Http\Controllers\Admin\LogManagementController::class, 'clear'])->name('admin.logs.clear');
+            Route::delete('{filename}', [App\Http\Controllers\Admin\LogManagementController::class, 'destroy'])->name('admin.logs.destroy');
+            Route::post('rotate', [App\Http\Controllers\Admin\LogManagementController::class, 'rotate'])->name('admin.logs.rotate');
+        });
+        
+        // バックアップ管理 UI
+        Route::get('admin/backups/manage', [App\Http\Controllers\Admin\BackupUIController::class, 'index'])->name('admin.backups.page');
+
+        // バックアップ管理（JSON API）
+        Route::prefix('admin/backups')->group(function () {
+            Route::get('/', [App\Http\Controllers\Admin\BackupController::class, 'index'])->name('admin.backups.index');
+            Route::get('statistics/summary', [App\Http\Controllers\Admin\BackupController::class, 'statistics'])->name('admin.backups.statistics');
+            Route::post('create/full', [App\Http\Controllers\Admin\BackupController::class, 'createFull'])->name('admin.backups.create.full');
+            Route::post('create/database', [App\Http\Controllers\Admin\BackupController::class, 'createDatabase'])->name('admin.backups.create.database');
+            Route::get('download/{filename}', [App\Http\Controllers\Admin\BackupController::class, 'download'])->name('admin.backups.download');
+            Route::delete('{filename}', [App\Http\Controllers\Admin\BackupController::class, 'destroy'])->name('admin.backups.destroy');
+            Route::post('restore/{filename}', [App\Http\Controllers\Admin\BackupController::class, 'restore'])->name('admin.backups.restore');
+            Route::post('cleanup', [App\Http\Controllers\Admin\BackupController::class, 'cleanup'])->name('admin.backups.cleanup');
+        });
+        
         // ロール管理
         Route::resource('roles', App\Http\Controllers\RoleController::class);
+
+        // 同期競合管理
+        Route::get('sync-conflicts', [App\Http\Controllers\SyncConflictController::class, 'index'])->name('sync-conflicts.index');
+        Route::get('sync-conflicts/{syncConflict}', [App\Http\Controllers\SyncConflictController::class, 'show'])->name('sync-conflicts.show');
+        Route::post('sync-conflicts/{syncConflict}/resolve', [App\Http\Controllers\SyncConflictController::class, 'resolve'])->name('sync-conflicts.resolve');
+        Route::post('sync-conflicts/{syncConflict}/ignore', [App\Http\Controllers\SyncConflictController::class, 'ignore'])->name('sync-conflicts.ignore');
+
+        // APIトークン管理
+        Route::get('api-tokens', [App\Http\Controllers\ApiTokenController::class, 'index'])->name('api-tokens.index');
+        Route::get('api-tokens/create', [App\Http\Controllers\ApiTokenController::class, 'create'])->name('api-tokens.create');
+        Route::post('api-tokens', [App\Http\Controllers\ApiTokenController::class, 'store'])->name('api-tokens.store');
+        Route::get('api-tokens/{apiToken}', [App\Http\Controllers\ApiTokenController::class, 'show'])->name('api-tokens.show');
+        Route::post('api-tokens/{apiToken}/revoke', [App\Http\Controllers\ApiTokenController::class, 'revoke'])->name('api-tokens.revoke');
+        Route::post('api-tokens/{apiToken}/unrevoke', [App\Http\Controllers\ApiTokenController::class, 'unrevoke'])->name('api-tokens.unrevoke');
+        Route::post('api-tokens/{apiToken}/regenerate', [App\Http\Controllers\ApiTokenController::class, 'regenerate'])->name('api-tokens.regenerate');
+        Route::post('api-tokens/cleanup-expired', [App\Http\Controllers\ApiTokenController::class, 'cleanupExpired'])->name('api-tokens.cleanup-expired');
+        Route::get('api-tokens-statistics', [App\Http\Controllers\ApiTokenController::class, 'statistics'])->name('api-tokens.statistics');
     });
 });
 

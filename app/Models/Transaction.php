@@ -24,6 +24,19 @@ class Transaction extends Model
         'notes',
     ];
 
+    /**
+     * コンストラクタ
+     */
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+
+        // HasSyncableFieldsトレイトの初期化メソッドを呼び出し
+        if (method_exists($this, 'initializeHasSyncableFields')) {
+            $this->initializeHasSyncableFields();
+        }
+    }
+
     protected $casts = [
         'unit_price' => 'decimal:2',
         'total_amount' => 'decimal:2',

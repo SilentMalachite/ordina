@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('closing_dates', function (Blueprint $table) {
             $table->id();
             $table->integer('day_of_month')->default(25);
+            $table->string('description', 500)->nullable();
             $table->boolean('is_active')->default(true);
             $table->foreignId('updated_by')->nullable()->constrained('users')->onDelete('set null');
             $table->timestamps();
