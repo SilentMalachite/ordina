@@ -70,7 +70,7 @@
                                     @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <form action="{{ route('customers.return-item', [$customer, $rental]) }}" method="POST" class="inline">
+                                    <form action="{{ route('transactions.return', $rental) }}" method="POST" class="inline">
                                         @csrf
                                         <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded text-xs"
                                             onclick="return confirm('この商品を返却済みにしますか？')">

@@ -25,8 +25,7 @@ class SyncController extends Controller
     {
         return response()->json([
             'status' => 'ok',
-            'timestamp' => now()->toIso8601String(),
-            'server_version' => config('app.version', '1.0.0')
+            'timestamp' => now()->toIso8601String()
         ]);
     }
 
