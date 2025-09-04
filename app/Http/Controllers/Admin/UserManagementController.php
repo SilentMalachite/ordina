@@ -109,6 +109,8 @@ class UserManagementController extends Controller
 
         if ($result['success']) {
             $data = $result['data'];
+            $roles = $data['roles'];
+            $userRole = $data['userRole'];
             return view('admin.edit-user', compact('user', 'roles', 'userRole'));
         }
 

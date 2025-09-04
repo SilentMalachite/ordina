@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Admin\DataManagementController;
 use App\Http\Controllers\Admin\SystemSettingsController;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class AdminController extends Controller
@@ -45,7 +46,7 @@ class AdminController extends Controller
         return $this->userController->store($request);
     }
 
-    public function editUser($user)
+    public function editUser(User $user)
     {
         return $this->userController->edit($user);
     }

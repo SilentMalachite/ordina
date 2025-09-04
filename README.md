@@ -150,6 +150,16 @@ ordina/
 └── tests/               # テスト
 ```
 
+### フロントエンド（Vite）
+```bash
+# 開発（HMR）
+npm run dev
+
+# 本番ビルド
+npm run build
+```
+NativePHPでの開発時は、`php artisan native:serve` と併せて `npm run dev` を起動しておくと便利です。
+
 ### テストの実行
 ```bash
 php artisan test

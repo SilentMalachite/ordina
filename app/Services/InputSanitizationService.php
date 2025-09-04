@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Log;
+
 class InputSanitizationService
 {
     /**
@@ -10,8 +12,20 @@ class InputSanitizationService
      */
     public function sanitizeSearchInput(string $input): string
     {
-        // 危険な文字をエスケープまたは削除
-        $input = $this->removeSqlInjectionCharacters($input);
+        // 文字エンコーディングを検証
+        if (!$this->isValidEncoding($input)) {
+            Log::warning('Invalid character encoding detected in search input', [
+                'input_length' => strlen($input),
+                'ip' => request()->ip(),
+            ]);
+            return '';
+        }
+
+        // SQLインジェクション対策
+        $input = $this->preventSqlInjection($input);
+
+        // XSS対策
+        $input = $this->preventXss($input);
 
         // 長さを制限（検索効率向上）
         $input = $this->limitLength($input, 100);
@@ -20,43 +34,74 @@ class InputSanitizationService
     }
 
     /**
-     * SQLインジェクションに使用される可能性のある文字を削除またはエスケープ
+     * SQLインジェクション攻撃を防止
      */
-    private function removeSqlInjectionCharacters(string $input): string
+    private function preventSqlInjection(string $input): string
     {
-        // 危険な文字を削除
-        $dangerousChars = [
-            ';',      // クエリ区切り
-            '--',     // SQLコメント
-            '/*',     // ブロックコメント開始
-            '*/',     // ブロックコメント終了
-            'xp_',    // SQL Server拡張ストアドプロシージャ
-            'sp_',    // システムストアドプロシージャ
-            'exec',   // 実行コマンド
-            'union',  // UNION攻撃
-            'select', // SELECTインジェクション
-            'insert', // INSERTインジェクション
-            'update', // UPDATEインジェクション
-            'delete', // DELETEインジェクション
-            'drop',   // DROPインジェクション
-            'create', // CREATEインジェクション
-            'alter',  // ALTERインジェクション
-            'script', // XSS攻撃
-            '<',      // HTMLタグ
-            '>',      // HTMLタグ
-            'javascript:', // JavaScriptインジェクション
-            'vbscript:',   // VBScriptインジェクション
-            'onload',     // イベントハンドラー
-            'onerror',    // イベントハンドラー
-            'onclick',    // イベントハンドラー
+        // 危険なSQLキーワードを検知してブロック
+        $dangerousPatterns = [
+            '/\b(union|select|insert|update|delete|drop|create|alter|exec|execute)\b/i',
+            '/\b(xp_|sp_)\w+/i',  // SQL Server拡張プロシージャ
+            '/--/',  // SQLコメント
+            '/\/\*.*?\*\//s',  // ブロックコメント
+            '/;(\s*|$)/',  // クエリ区切り
         ];
 
-        // 大文字小文字を区別しない検索・置換
-        foreach ($dangerousChars as $char) {
-            $input = str_ireplace($char, '', $input);
+        foreach ($dangerousPatterns as $pattern) {
+            if (preg_match($pattern, $input)) {
+                Log::warning('SQL injection attempt detected', [
+                    'pattern' => $pattern,
+                    'input' => substr($input, 0, 50) . '...',
+                    'ip' => request()->ip(),
+                ]);
+                // 危険な入力の場合は空文字を返す
+                return '';
+            }
+        }
+
+        // 特殊文字をエスケープ
+        $input = addslashes($input);
+
+        return $input;
+    }
+
+    /**
+     * XSS攻撃を防止
+     */
+    private function preventXss(string $input): string
+    {
+        // HTMLタグをエスケープ
+        $input = htmlspecialchars($input, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // JavaScript関連の危険な文字列を検知
+        $dangerousJsPatterns = [
+            '/javascript:/i',
+            '/vbscript:/i',
+            '/data:/i',
+            '/on\w+\s*=/i',  // イベントハンドラー
+        ];
+
+        foreach ($dangerousJsPatterns as $pattern) {
+            if (preg_match($pattern, $input)) {
+                Log::warning('XSS attempt detected', [
+                    'pattern' => $pattern,
+                    'input' => substr($input, 0, 50) . '...',
+                    'ip' => request()->ip(),
+                ]);
+                return '';
+            }
         }
 
         return $input;
+    }
+
+    /**
+     * 文字エンコーディングを検証
+     */
+    private function isValidEncoding(string $input): bool
+    {
+        // UTF-8エンコーディングを検証
+        return mb_check_encoding($input, 'UTF-8');
     }
 
     /**
@@ -113,16 +158,34 @@ class InputSanitizationService
      */
     public function sanitizeOrderByInput(string $input, array $allowedColumns = []): ?string
     {
+        // 文字エンコーディングを検証
+        if (!$this->isValidEncoding($input)) {
+            Log::warning('Invalid encoding in order by input', ['input' => $input]);
+            return null;
+        }
+
+        // XSS対策
+        $input = $this->preventXss($input);
+
         // 空白を削除
         $input = trim($input);
 
         // 許可されたカラムのみを許可
         if (!empty($allowedColumns) && !in_array($input, $allowedColumns)) {
+            Log::warning('Unauthorized column in order by', [
+                'column' => $input,
+                'allowed' => $allowedColumns,
+                'ip' => request()->ip(),
+            ]);
             return null;
         }
 
-        // 英数字、アンダースコア、ドットのみを許可
-        if (!preg_match('/^[a-zA-Z0-9_.]+$/', $input)) {
+        // 英数字、アンダースコア、ドットのみを許可（より厳密に）
+        if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_.]*$/', $input)) {
+            Log::warning('Invalid column name format in order by', [
+                'column' => $input,
+                'ip' => request()->ip(),
+            ]);
             return null;
         }
 
@@ -134,15 +197,33 @@ class InputSanitizationService
      */
     public function sanitizeTableName(string $input, array $allowedTables = []): ?string
     {
+        // 文字エンコーディングを検証
+        if (!$this->isValidEncoding($input)) {
+            Log::warning('Invalid encoding in table name', ['input' => $input]);
+            return null;
+        }
+
+        // XSS対策
+        $input = $this->preventXss($input);
+
         $input = trim($input);
 
         // 許可されたテーブル名のみを許可
         if (!empty($allowedTables) && !in_array($input, $allowedTables)) {
+            Log::warning('Unauthorized table name access', [
+                'table' => $input,
+                'allowed' => $allowedTables,
+                'ip' => request()->ip(),
+            ]);
             return null;
         }
 
-        // 英数字、アンダースコアのみを許可
-        if (!preg_match('/^[a-zA-Z0-9_]+$/', $input)) {
+        // 英数字、アンダースコアのみを許可（テーブル名として妥当な形式）
+        if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_]*$/', $input)) {
+            Log::warning('Invalid table name format', [
+                'table' => $input,
+                'ip' => request()->ip(),
+            ]);
             return null;
         }
 
@@ -207,3 +288,4 @@ class InputSanitizationService
         ];
     }
 }
+
