@@ -24,6 +24,8 @@ class AdminTest extends TestCase
         parent::setUp();
         
         $this->admin = User::factory()->create(['is_admin' => true]);
+        $this->admin->assignRole('管理者');
+        
         $this->user = User::factory()->create(['is_admin' => false]);
     }
 
@@ -71,13 +73,13 @@ class AdminTest extends TestCase
             'email' => $this->faker->unique()->safeEmail,
             'password' => 'password123',
             'password_confirmation' => 'password123',
-            'is_admin' => false
+            'role' => '一般スタッフ'
         ];
 
         $response = $this->actingAs($this->admin)
             ->post('/admin/users', $userData);
 
-        $response->assertRedirect('/admin/users');
+        $response->assertRedirect(route('admin.users'));
         $response->assertSessionHas('success');
 
         $this->assertDatabaseHas('users', [
@@ -94,13 +96,13 @@ class AdminTest extends TestCase
             'email' => $this->faker->unique()->safeEmail,
             'password' => 'password123',
             'password_confirmation' => 'password123',
-            'is_admin' => true
+            'role' => '管理者'
         ];
 
         $response = $this->actingAs($this->admin)
             ->post('/admin/users', $userData);
 
-        $response->assertRedirect('/admin/users');
+        $response->assertRedirect(route('admin.users'));
         
         $this->assertDatabaseHas('users', [
             'name' => $userData['name'],
@@ -115,6 +117,11 @@ class AdminTest extends TestCase
         
         $response = $this->actingAs($this->admin)
             ->get("/admin/users/{$targetUser->id}/edit");
+        
+        // 500エラーの詳細を確認
+        if ($response->status() === 500) {
+            $this->fail('500 error: ' . $response->getContent());
+        }
         
         $response->assertStatus(200);
         $response->assertViewIs('admin.edit-user');

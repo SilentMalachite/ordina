@@ -1,0 +1,6 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 質問・相談（Discussions）
+    url: https://github.com/SilentMalachite/ordina/discussions
+    about: 使い方や設計の相談はこちら
+

@@ -94,7 +94,7 @@ Route::middleware('auth')->group(function () {
     Route::get('stock-alerts/statistics', [App\Http\Controllers\StockAlertController::class, 'statistics'])->name('stock-alerts.statistics');
 
     // 管理者機能
-    Route::middleware(['auth', 'permission:system-manage'])->group(function () {
+    Route::middleware(['auth', 'role:管理者'])->group(function () {
         Route::get('admin', [App\Http\Controllers\AdminController::class, 'index'])->name('admin.index');
         Route::get('admin/users', [App\Http\Controllers\AdminController::class, 'users'])->name('admin.users');
         Route::get('admin/users/create', [App\Http\Controllers\AdminController::class, 'createUser'])->name('admin.users.create');
@@ -145,24 +145,12 @@ Route::middleware('auth')->group(function () {
         
         // ロール管理
         Route::resource('roles', App\Http\Controllers\RoleController::class);
-
-        // 同期競合管理
-        Route::get('sync-conflicts', [App\Http\Controllers\SyncConflictController::class, 'index'])->name('sync-conflicts.index');
-        Route::get('sync-conflicts/{syncConflict}', [App\Http\Controllers\SyncConflictController::class, 'show'])->name('sync-conflicts.show');
-        Route::post('sync-conflicts/{syncConflict}/resolve', [App\Http\Controllers\SyncConflictController::class, 'resolve'])->name('sync-conflicts.resolve');
-        Route::post('sync-conflicts/{syncConflict}/ignore', [App\Http\Controllers\SyncConflictController::class, 'ignore'])->name('sync-conflicts.ignore');
-
-        // APIトークン管理
-        Route::get('api-tokens', [App\Http\Controllers\ApiTokenController::class, 'index'])->name('api-tokens.index');
-        Route::get('api-tokens/create', [App\Http\Controllers\ApiTokenController::class, 'create'])->name('api-tokens.create');
-        Route::post('api-tokens', [App\Http\Controllers\ApiTokenController::class, 'store'])->name('api-tokens.store');
-        Route::get('api-tokens/{apiToken}', [App\Http\Controllers\ApiTokenController::class, 'show'])->name('api-tokens.show');
-        Route::post('api-tokens/{apiToken}/revoke', [App\Http\Controllers\ApiTokenController::class, 'revoke'])->name('api-tokens.revoke');
-        Route::post('api-tokens/{apiToken}/unrevoke', [App\Http\Controllers\ApiTokenController::class, 'unrevoke'])->name('api-tokens.unrevoke');
-        Route::post('api-tokens/{apiToken}/regenerate', [App\Http\Controllers\ApiTokenController::class, 'regenerate'])->name('api-tokens.regenerate');
-        Route::post('api-tokens/cleanup-expired', [App\Http\Controllers\ApiTokenController::class, 'cleanupExpired'])->name('api-tokens.cleanup-expired');
-        Route::get('api-tokens-statistics', [App\Http\Controllers\ApiTokenController::class, 'statistics'])->name('api-tokens.statistics');
     });
 });
+
+// CSPレポート用ルート
+Route::post('/csp-report', [App\Http\Controllers\CSPReportController::class, 'report'])
+    ->name('csp-report')
+    ->middleware('throttle:10,1'); // 1分間に10リクエストまで制限
 
 require __DIR__.'/auth.php';
