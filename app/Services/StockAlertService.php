@@ -27,7 +27,8 @@ class StockAlertService
     public function checkLowStock(): array
     {
         $result = $this->errorService->safeDatabaseOperation(function() {
-            return Product::where('stock_quantity', '<=', $this->lowStockThreshold)
+            return Product::where('stock_quantity', '>', 0)
+                ->where('stock_quantity', '<=', $this->lowStockThreshold)
                 ->orderBy('stock_quantity', 'asc')
                 ->get();
         }, '低在庫商品のチェック');
@@ -182,10 +183,14 @@ class StockAlertService
     public function getAlertStatistics(): array
     {
         $result = $this->errorService->safeDatabaseOperation(function() {
+            $low = Product::where('stock_quantity', '>', 0)
+                ->where('stock_quantity', '<=', $this->lowStockThreshold)
+                ->count();
+            $out = Product::where('stock_quantity', 0)->count();
             return [
-                'total_products' => Product::count(),
-                'low_stock_products' => Product::where('stock_quantity', '<=', $this->lowStockThreshold)->count(),
-                'out_of_stock_products' => Product::where('stock_quantity', 0)->count(),
+                'total_products' => $low + $out,
+                'low_stock_products' => $low,
+                'out_of_stock_products' => $out,
                 'low_stock_threshold' => $this->lowStockThreshold,
                 'last_check' => now()->format('Y-m-d H:i:s')
             ];

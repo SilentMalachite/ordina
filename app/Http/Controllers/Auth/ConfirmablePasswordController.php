@@ -25,13 +25,14 @@ class ConfirmablePasswordController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        if (! Auth::guard('web')->validate([
-            'email' => $request->user()->email,
-            'password' => $request->password,
-        ])) {
-            throw ValidationException::withMessages([
-                'password' => __('auth.password'),
-            ]);
+        // 必須チェックのみバリデーション
+        $request->validate([
+            'password' => ['required'],
+        ]);
+
+        // ここで明示的に現在のパスワードと照合し、失敗時はセッションにエラーを積んでリダイレクト
+        if (! \Illuminate\Support\Facades\Hash::check($request->input('password'), $request->user()->password)) {
+            return back()->withErrors(['password' => __('auth.password')]);
         }
 
         $request->session()->put('auth.password_confirmed_at', time());

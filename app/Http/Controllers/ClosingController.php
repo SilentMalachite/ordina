@@ -78,19 +78,28 @@ class ClosingController extends Controller
      */
     public function show(Request $request)
     {
-        $validator = \Validator::make($request->all(), [
-            'closing_date_id' => 'required|exists:closing_dates,id',
-            'closing_date' => 'required|date',
-        ]);
+        // パラメータ未指定時はデフォルト値を採用（最新の締め日／本日）
+        $closingDateId = $request->input('closing_date_id')
+            ?? ClosingDate::query()->latest('id')->value('id');
+        $closingDateStr = $request->input('closing_date')
+            ?? now()->toDateString();
+
+        // バリデーション（デフォルト適用後）
+        $validator = \Validator::make(
+            ['closing_date_id' => $closingDateId, 'closing_date' => $closingDateStr],
+            [
+                'closing_date_id' => 'required|exists:closing_dates,id',
+                'closing_date' => 'required|date',
+            ]
+        );
 
         if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator);
+            return redirect()->back()->withErrors($validator);
         }
 
         $result = $this->closingService->processClosing(
-            $request->closing_date_id,
-            Carbon::parse($request->closing_date)
+            $closingDateId,
+            Carbon::parse($closingDateStr)
         );
 
         if ($result['success']) {

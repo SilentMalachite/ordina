@@ -34,6 +34,7 @@ Route::middleware('auth')->group(function () {
     // 在庫管理
     Route::get('inventory', [App\Http\Controllers\InventoryController::class, 'index'])->name('inventory.index');
     Route::get('inventory/adjustments', [App\Http\Controllers\InventoryController::class, 'adjustments'])->name('inventory.adjustments');
+    Route::post('inventory/adjustments', [App\Http\Controllers\InventoryController::class, 'storeAdjustment'])->name('inventory.adjustments.store');
     Route::get('inventory/adjustment/create', [App\Http\Controllers\InventoryController::class, 'createAdjustment'])->name('inventory.adjustment.create');
     Route::post('inventory/adjustment', [App\Http\Controllers\InventoryController::class, 'storeAdjustment'])->name('inventory.adjustment.store');
     Route::get('inventory/stock-alert', [App\Http\Controllers\InventoryController::class, 'stockAlert'])->name('inventory.stock-alert');
@@ -96,7 +97,7 @@ Route::middleware('auth')->group(function () {
     // 管理者機能
     Route::middleware(['auth', 'role:管理者'])->group(function () {
         Route::get('admin', [App\Http\Controllers\AdminController::class, 'index'])->name('admin.index');
-        Route::get('admin/users', [App\Http\Controllers\AdminController::class, 'users'])->name('admin.users');
+        Route::get('admin/users', [App\Http\Controllers\Admin\UserManagementController::class, 'index'])->name('admin.users');
         Route::get('admin/users/create', [App\Http\Controllers\AdminController::class, 'createUser'])->name('admin.users.create');
         Route::post('admin/users', [App\Http\Controllers\AdminController::class, 'storeUser'])->name('admin.users.store');
         Route::get('admin/users/{user}/edit', [App\Http\Controllers\AdminController::class, 'editUser'])->name('admin.users.edit');

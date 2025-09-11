@@ -27,8 +27,9 @@ class TransactionFactory extends Factory
         
         $data = [
             'type' => $type,
-            'customer_id' => Customer::factory(),
-            'product_id' => Product::factory(),
+            // 付随して作成される顧客・商品は同期対象外（is_dirty=false）
+            'customer_id' => Customer::factory()->state(['is_dirty' => false]),
+            'product_id' => Product::factory()->state(['is_dirty' => false]),
             'user_id' => User::factory(),
             'quantity' => $quantity,
             'unit_price' => $unitPrice,

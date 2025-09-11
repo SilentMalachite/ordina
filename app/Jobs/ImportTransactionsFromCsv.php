@@ -197,9 +197,11 @@ class ImportTransactionsFromCsv implements ShouldQueue
                 'error' => $e->getMessage()
             ]);
 
-            Notification::title('取引インポート失敗')
-                ->message('エラーが発生しました: ' . $e->getMessage())
-                ->show();
+            if (config('nativephp.enabled') && !app()->environment('testing')) {
+                \Native\Laravel\Facades\Notification::title('取引インポート失敗')
+                    ->message('エラーが発生しました: ' . $e->getMessage())
+                    ->show();
+            }
         }
     }
 
@@ -303,14 +305,16 @@ class ImportTransactionsFromCsv implements ShouldQueue
      */
     private function sendNotification(int $success, int $errors): void
     {
-        if ($errors === 0) {
-            Notification::title('取引インポート完了')
-                ->message("{$success}件の取引を正常にインポートしました。")
-                ->show();
-        } else {
-            Notification::title('取引インポート完了（エラーあり）')
-                ->message("成功: {$success}件、エラー: {$errors}件")
-                ->show();
+        if (config('nativephp.enabled') && !app()->environment('testing')) {
+            if ($errors === 0) {
+                \Native\Laravel\Facades\Notification::title('取引インポート完了')
+                    ->message("{$success}件の取引を正常にインポートしました。")
+                    ->show();
+            } else {
+                \Native\Laravel\Facades\Notification::title('取引インポート完了（エラーあり）')
+                    ->message("成功: {$success}件、エラー: {$errors}件")
+                    ->show();
+            }
         }
     }
 }

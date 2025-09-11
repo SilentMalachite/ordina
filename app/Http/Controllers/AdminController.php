@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Admin\DataManagementController;
 use App\Http\Controllers\Admin\SystemSettingsController;
 use App\Models\User;
+use App\Models\ClosingDate;
 use Illuminate\Http\Request;
 
 class AdminController extends Controller
@@ -51,12 +52,12 @@ class AdminController extends Controller
         return $this->userController->edit($user);
     }
 
-    public function updateUser(Request $request, $user)
+    public function updateUser(Request $request, User $user)
     {
         return $this->userController->update($request, $user);
     }
 
-    public function destroyUser($user)
+    public function destroyUser(User $user)
     {
         return $this->userController->destroy($user);
     }
@@ -103,7 +104,7 @@ class AdminController extends Controller
         return $this->settingsController->storeClosingDate($request);
     }
 
-    public function destroyClosingDate($closingDate)
+    public function destroyClosingDate(ClosingDate $closingDate)
     {
         return $this->settingsController->destroyClosingDate($closingDate);
     }

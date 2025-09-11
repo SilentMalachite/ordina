@@ -112,8 +112,10 @@ class ImportProductsFromCsv implements ShouldQueue
                 ],
             ]);
 
-            // 結果を通知
-            $this->sendNotification($success, $errors);
+            // 結果を通知（テスト環境/無効化時はスキップ）
+            if (config('nativephp.enabled') && !app()->environment('testing')) {
+                $this->sendNotification($success, $errors);
+            }
 
             // エラーがあればログに記録
             if (!empty($errorMessages)) {
@@ -138,9 +140,11 @@ class ImportProductsFromCsv implements ShouldQueue
                 'error' => $e->getMessage()
             ]);
 
-            Notification::title('商品インポート失敗')
-                ->message('エラーが発生しました: ' . $e->getMessage())
-                ->show();
+            if (config('nativephp.enabled') && !app()->environment('testing')) {
+                \Native\Laravel\Facades\Notification::title('商品インポート失敗')
+                    ->message('エラーが発生しました: ' . $e->getMessage())
+                    ->show();
+            }
         }
     }
 
@@ -208,14 +212,16 @@ class ImportProductsFromCsv implements ShouldQueue
      */
     private function sendNotification(int $success, int $errors): void
     {
-        if ($errors === 0) {
-            Notification::title('商品インポート完了')
-                ->message("{$success}件の商品を正常にインポートしました。")
-                ->show();
-        } else {
-            Notification::title('商品インポート完了（エラーあり）')
-                ->message("成功: {$success}件、エラー: {$errors}件")
-                ->show();
+        if (config('nativephp.enabled') && !app()->environment('testing')) {
+            if ($errors === 0) {
+                \Native\Laravel\Facades\Notification::title('商品インポート完了')
+                    ->message("{$success}件の商品を正常にインポートしました。")
+                    ->show();
+            } else {
+                \Native\Laravel\Facades\Notification::title('商品インポート完了（エラーあり）')
+                    ->message("成功: {$success}件、エラー: {$errors}件")
+                    ->show();
+            }
         }
     }
 }

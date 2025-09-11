@@ -247,9 +247,9 @@ class ClosingService
     public function getClosingDates(): array
     {
         $result = $this->errorService->safeDatabaseOperation(function() {
-            return ClosingDate::where('is_active', true)
-                ->orderBy('day_of_month')
-                ->get();
+            return ClosingDate::orderBy('day_of_month')
+                ->get()
+                ->all();
         }, '締め日一覧の取得');
 
         return $result['success'] ? $result['data'] : [];

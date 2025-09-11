@@ -9,11 +9,18 @@ use Carbon\Carbon;
 
 class DesktopNotificationService
 {
+    private function canNotify(): bool
+    {
+        // テスト環境や無効化設定時は通知しない
+        return (bool) config('nativephp.enabled') && !app()->environment('testing');
+    }
+
     /**
      * 低在庫アラートを送信
      */
     public function sendLowStockAlert(Product $product): void
     {
+        if (!$this->canNotify()) { return; }
         if ($product->stock_quantity <= 10) {
             Notification::title('低在庫アラート')
                 ->message("商品「{$product->name}」の在庫が少なくなっています。\n現在の在庫数: {$product->stock_quantity}個")
@@ -26,6 +33,7 @@ class DesktopNotificationService
      */
     public function sendTransactionNotification(Transaction $transaction): void
     {
+        if (!$this->canNotify()) { return; }
         $type = $transaction->type === 'sale' ? '売上' : '貸出';
         
         Notification::title('取引完了')
@@ -38,6 +46,7 @@ class DesktopNotificationService
      */
     public function sendDailySummary(): void
     {
+        if (!$this->canNotify()) { return; }
         $today = Carbon::today();
         
         // 今日の売上統計
@@ -69,6 +78,7 @@ class DesktopNotificationService
      */
     public function sendBackupNotification(string $filename): void
     {
+        if (!$this->canNotify()) { return; }
         Notification::title('バックアップ完了')
             ->message("データバックアップが正常に完了しました。\nファイル: {$filename}")
             ->show();
@@ -79,6 +89,7 @@ class DesktopNotificationService
      */
     public function sendErrorNotification(string $title, string $message): void
     {
+        if (!$this->canNotify()) { return; }
         Notification::title($title)
             ->message($message)
             ->show();
@@ -89,6 +100,7 @@ class DesktopNotificationService
      */
     public function sendSuccessNotification(string $title, string $message): void
     {
+        if (!$this->canNotify()) { return; }
         Notification::title($title)
             ->message($message)
             ->show();

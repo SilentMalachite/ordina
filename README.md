@@ -165,6 +165,9 @@ NativePHPでの開発時は、`php artisan native:serve` と併せて `npm run d
 php artisan test
 ```
 
+テストではデスクトップ通知（NativePHP）を無効化しています（`phpunit.xml` の `NATIVEPHP_ENABLED=false`）。
+ローカル開発で通知を有効にする場合は `.env` に `NATIVEPHP_ENABLED=true` を設定してください。
+
 ### コードスタイル
 ```bash
 ./vendor/bin/pint

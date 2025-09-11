@@ -63,7 +63,7 @@ class SalesReportExport implements FromCollection, WithHeadings, WithMapping, Wi
             $transaction->product->product_code,
             $transaction->product->name,
             $transaction->customer->name,
-            $transaction->customer->company ?? '',
+            $transaction->customer->company_name ?? '',
             $transaction->quantity,
             number_format($transaction->unit_price),
             number_format($transaction->total_amount),

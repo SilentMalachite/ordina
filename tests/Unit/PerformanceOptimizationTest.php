@@ -99,7 +99,6 @@ class PerformanceOptimizationTest extends TestCase
         $stats2 = $service->getDashboardStatistics();
         
         $this->assertEquals($stats1, $stats2);
-        $this->assertEquals(5, $stats1['total_products']);
         $this->assertEquals(10, $stats1['total_products']);
         $this->assertEquals(8, $stats1['total_customers']);
     }

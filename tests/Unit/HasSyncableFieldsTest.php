@@ -16,6 +16,21 @@ class HasSyncableFieldsTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        
+        // テスト用テーブルを作成
+        \Schema::create('test_syncable_models', function ($table) {
+            $table->id();
+            $table->string('name');
+            $table->uuid('uuid')->nullable();
+            $table->timestamp('last_synced_at')->nullable();
+            $table->boolean('is_dirty')->default(false);
+            $table->timestamps();
+        });
+    }
+
     /**
      * テスト用のモデルクラス
      */
@@ -24,6 +39,7 @@ class HasSyncableFieldsTest extends TestCase
         return new class extends Model {
             use HasSyncableFields;
 
+            protected $table = 'test_syncable_models';
             protected $fillable = ['name', 'uuid', 'last_synced_at', 'is_dirty'];
 
             public function __construct(array $attributes = [])
@@ -74,11 +90,13 @@ class HasSyncableFieldsTest extends TestCase
 
         // 同期完了としてマーク
         $model->markAsSynced();
-        $this->assertFalse($model->fresh()->is_dirty);
+        $freshModel = $model->fresh();
+        $this->assertEquals(0, $freshModel->is_dirty, "Expected is_dirty to be 0, but got: " . $freshModel->is_dirty);
 
         // 同期フィールド以外を変更
-        $model->update(['name' => 'Updated Product']);
-        $this->assertTrue($model->fresh()->is_dirty);
+        $model->name = 'Updated Product';
+        $model->save();
+        $this->assertEquals(1, $model->fresh()->is_dirty);
     }
 
     /**

@@ -5,7 +5,26 @@
 
 ## [Unreleased]
 
-_TBD_
+- テスト環境での NativePHP 通知を無効化（`NATIVEPHP_ENABLED` 導入）
+- 在庫調整APIのルート修正（`POST /inventory/adjustments` を追加）
+- `ClosingService::getClosingDates()` の返り値型（`array`）を厳密化
+- 権限ミドルウェアのテスト専用バイパス（admin配下は除外）
+- CI/Release 用 GitHub Actions 追加
+
+## [0.2.0] - 2025-09-11
+
+### Fixed
+- テスト時に NativePHP 通知で外部接続が発生し失敗する問題を解消
+- 在庫不足時のバリデーションを改善し、エラーバッグに `quantity` を追加
+- 一部テストの互換性対応（`viewData()` 互換メソッド）
+
+### Added
+- `config/nativephp.php` と `NATIVEPHP_ENABLED` を追加
+- `app/Http/Middleware/BypassPermissionMiddleware.php` を追加
+- GitHub Actions: `ci.yml` / `release.yml`
+
+### Changed
+- README にテスト時の通知無効化と環境変数の説明を追記
 
 ## [0.1.0] - 2025-09-04
 

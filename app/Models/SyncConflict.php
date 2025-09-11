@@ -28,6 +28,10 @@ class SyncConflict extends Model
         'resolved_at' => 'datetime',
     ];
 
+    protected $attributes = [
+        'status' => 'pending',
+    ];
+
     /**
      * 競合を解決したユーザー
      */

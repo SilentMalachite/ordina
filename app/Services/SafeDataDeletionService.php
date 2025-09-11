@@ -231,7 +231,7 @@ class SafeDataDeletionService
             'products_count' => Product::count(),
             'customers_count' => Customer::count(),
             'transactions_count' => Transaction::count(),
-            'inventory_adjustments_count' => InventoryAdjustment::count(),
+            'adjustments_count' => InventoryAdjustment::count(),
             'closing_dates_count' => ClosingDate::count(),
             'database_size' => $this->getDatabaseSize()
         ];

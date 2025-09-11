@@ -65,7 +65,7 @@ class ExcelExportTest extends TestCase
     public function test_sales_report_export_mapping()
     {
         $user = User::factory()->create(['name' => 'テストユーザー']);
-        $customer = Customer::factory()->create(['name' => 'テスト顧客', 'company' => 'テスト会社']);
+        $customer = Customer::factory()->create(['name' => 'テスト顧客', 'company_name' => 'テスト会社']);
         $product = Product::factory()->create(['product_code' => 'TEST001', 'name' => 'テスト商品']);
         
         $transaction = Transaction::factory()->create([
@@ -173,7 +173,7 @@ class ExcelExportTest extends TestCase
     {
         $customer = Customer::factory()->create([
             'name' => 'テスト顧客',
-            'company' => 'テスト会社',
+            'company_name' => 'テスト会社',
             'email' => 'test@example.com',
             'phone' => '090-1234-5678',
             'address' => 'テスト住所'

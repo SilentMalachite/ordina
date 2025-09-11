@@ -79,19 +79,31 @@ class InventoryController extends Controller
 
     public function storeAdjustment(StoreInventoryAdjustmentRequest $request)
     {
+        // バリデーション（在庫数チェックを含む）
+        $validator = \Validator::make($request->all(), [
+            'product_id' => 'required|exists:products,id',
+            'adjustment_type' => 'required|in:increase,decrease',
+            'quantity' => 'required|integer|min:1',
+            'reason' => 'nullable|string|max:255',
+        ]);
+
+        $product = Product::find($request->product_id);
+        if ($product && $request->adjustment_type === 'decrease' && $product->stock_quantity < $request->quantity) {
+            $validator->after(function ($v) {
+                $v->errors()->add('quantity', '在庫数が不足しています。');
+            });
+        }
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
 
         try {
-            DB::transaction(function() use ($request) {
-                $product = Product::findOrFail($request->product_id);
-                
-                $adjustmentQuantity = $request->adjustment_type === 'increase' 
-                    ? $request->quantity 
+            DB::transaction(function() use ($request, $product) {
+                $adjustmentQuantity = $request->adjustment_type === 'increase'
+                    ? $request->quantity
                     : -$request->quantity;
-                
-                if ($request->adjustment_type === 'decrease' && $product->stock_quantity < $request->quantity) {
-                    throw new \Exception('在庫数が不足しています。');
-                }
-                
+
                 InventoryAdjustment::create([
                     'product_id' => $request->product_id,
                     'user_id' => auth()->id(),
@@ -101,18 +113,19 @@ class InventoryController extends Controller
                     'new_quantity' => $product->stock_quantity + $adjustmentQuantity,
                     'reason' => $request->reason,
                 ]);
-                
+
                 $product->update([
-                    'stock_quantity' => $product->stock_quantity + $adjustmentQuantity
+                    'stock_quantity' => $product->stock_quantity + $adjustmentQuantity,
+                    'is_dirty' => true,
                 ]);
             });
 
             return redirect()->route('inventory.adjustments')
                 ->with('success', '在庫調整が正常に記録されました。');
-                
+
         } catch (\Exception $e) {
             \Log::error('在庫調整処理中にエラーが発生しました: ' . $e->getMessage());
-            
+
             return redirect()->back()
                 ->withInput()
                 ->with('error', 'エラーが発生しました: ' . $e->getMessage());
@@ -136,20 +149,36 @@ class InventoryController extends Controller
 
     public function storeBulkAdjustment(BulkInventoryAdjustmentRequest $request)
     {
+        // 事前検証（不足在庫をまとめて検出）
+        $validator = \Validator::make($request->all(), [
+            'adjustments' => 'required|array|min:1',
+            'reason' => 'nullable|string|max:255',
+        ]);
+
+        foreach ($request->adjustments as $index => $adjustment) {
+            $product = Product::find($adjustment['product_id'] ?? null);
+            if (!$product) {
+                $validator->errors()->add("adjustments.$index.product_id", '商品が存在しません。');
+                continue;
+            }
+            if (($adjustment['adjustment_type'] ?? '') === 'decrease' && $product->stock_quantity < ($adjustment['quantity'] ?? 0)) {
+                $validator->errors()->add("adjustments.$index.quantity", "商品「{$product->name}」の在庫数が不足しています。");
+            }
+        }
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
 
         try {
             DB::transaction(function() use ($request) {
                 foreach ($request->adjustments as $adjustment) {
                     $product = Product::findOrFail($adjustment['product_id']);
-                    
-                    $adjustmentQuantity = $adjustment['adjustment_type'] === 'increase' 
-                        ? $adjustment['quantity'] 
+
+                    $adjustmentQuantity = $adjustment['adjustment_type'] === 'increase'
+                        ? $adjustment['quantity']
                         : -$adjustment['quantity'];
-                    
-                    if ($adjustment['adjustment_type'] === 'decrease' && $product->stock_quantity < $adjustment['quantity']) {
-                        throw new \Exception("商品「{$product->name}」の在庫数が不足しています。");
-                    }
-                    
+
                     InventoryAdjustment::create([
                         'product_id' => $adjustment['product_id'],
                         'user_id' => auth()->id(),
@@ -159,19 +188,20 @@ class InventoryController extends Controller
                         'new_quantity' => $product->stock_quantity + $adjustmentQuantity,
                         'reason' => $request->reason,
                     ]);
-                    
+
                     $product->update([
-                        'stock_quantity' => $product->stock_quantity + $adjustmentQuantity
+                        'stock_quantity' => $product->stock_quantity + $adjustmentQuantity,
+                        'is_dirty' => true,
                     ]);
                 }
             });
 
             return redirect()->route('inventory.adjustments')
                 ->with('success', '一括在庫調整が正常に記録されました。');
-                
+
         } catch (\Exception $e) {
             \Log::error('一括在庫調整処理中にエラーが発生しました: ' . $e->getMessage());
-            
+
             return redirect()->back()
                 ->withInput()
                 ->with('error', 'エラーが発生しました: ' . $e->getMessage());

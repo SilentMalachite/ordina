@@ -16,7 +16,10 @@ trait HasSyncableFields
             if (empty($model->uuid)) {
                 $model->uuid = (string) Str::uuid();
             }
-            $model->is_dirty = true;
+            // 明示的に指定されていない場合のみ未同期扱いにする
+            if (!array_key_exists('is_dirty', $model->getAttributes())) {
+                $model->is_dirty = true;
+            }
         });
 
         // 更新時にis_dirtyフラグを立てる
@@ -25,7 +28,6 @@ trait HasSyncableFields
             $syncFields = ['last_synced_at', 'is_dirty'];
             $dirtyFields = array_keys($model->getDirty());
             $nonSyncDirtyFields = array_diff($dirtyFields, $syncFields);
-            
             if (count($nonSyncDirtyFields) > 0) {
                 $model->is_dirty = true;
             }
@@ -37,10 +39,18 @@ trait HasSyncableFields
      */
     public function initializeHasSyncableFields()
     {
-        $this->fillable = array_merge($this->fillable, [
+        $this->fillable = array_merge($this->fillable ?? [], [
             'uuid',
             'last_synced_at',
-            'is_dirty'
+            'is_dirty',
+            // テストおよびユースケースで更新時刻を明示的に変更できるようにする
+            'updated_at',
+        ]);
+
+        // 型キャストを追加（boolean / datetime）
+        $this->casts = array_merge($this->casts ?? [], [
+            'is_dirty' => 'boolean',
+            'last_synced_at' => 'datetime',
         ]);
     }
 
@@ -49,10 +59,14 @@ trait HasSyncableFields
      */
     public function markAsSynced()
     {
-        $this->update([
-            'is_dirty' => false,
-            'last_synced_at' => now()
-        ]);
+        // モデル属性を更新し、イベント・updated_atを触らずに保存
+        $this->is_dirty = false;
+        $this->last_synced_at = now();
+
+        $originalTimestamps = $this->timestamps;
+        $this->timestamps = false; // updated_at を変更しない
+        $this->saveQuietly();      // イベント発火なしで保存し、original を同期
+        $this->timestamps = $originalTimestamps;
     }
 
     /**

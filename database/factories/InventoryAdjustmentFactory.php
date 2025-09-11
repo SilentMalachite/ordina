@@ -23,7 +23,8 @@ class InventoryAdjustmentFactory extends Factory
         $previousQuantity = $this->faker->numberBetween(10, 100);
         
         return [
-            'product_id' => Product::factory(),
+            // 付随して作成される商品は同期対象外（is_dirty=false）
+            'product_id' => Product::factory()->state(['is_dirty' => false]),
             'user_id' => User::factory(),
             'adjustment_type' => $adjustmentType,
             'quantity' => $quantity,

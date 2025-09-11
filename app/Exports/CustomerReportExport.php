@@ -45,7 +45,7 @@ class CustomerReportExport implements FromCollection, WithHeadings, WithMapping,
         return [
             $customer->id,
             $customer->name,
-            $customer->company ?? '',
+            $customer->company_name ?? '',
             $customer->email,
             $customer->phone ?? '',
             $customer->address ?? '',

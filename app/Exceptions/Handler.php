@@ -36,17 +36,28 @@ class Handler extends ExceptionHandler
      */
     public function render($request, Throwable $exception)
     {
-        // APIリクエストまたはJSONを期待するリクエストの場合
-        if ($request->expectsJson() || $request->is('api/*')) {
-            $errorService = new ErrorHandlingService();
-            $errorResponse = $errorService->handleException($exception, $request);
-            
-            return response()->json($errorResponse, $errorResponse['status_code'] ?? 500);
+        // バリデーション例外はまずここで扱う（API以外はリダイレクト＋セッションエラー）
+        if ($exception instanceof ValidationException) {
+            // API 経路のみ JSON で返す
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'VALIDATION_ERROR',
+                    'message' => '入力データに問題があります。',
+                    'errors' => $exception->errors(),
+                ], 422);
+            }
+            // リダイレクト＋セッションにエラーを格納（標準動作の簡易実装）
+            return redirect()->back()
+                ->withInput($request->except($this->dontFlash))
+                ->withErrors($exception->errors(), $exception->errorBag);
         }
 
-        // バリデーション例外の特別処理
-        if ($exception instanceof ValidationException) {
-            return $this->handleValidationException($exception, $request);
+        // API リクエスト、または明示的に JSON を期待する場合は共通 JSON エラーにフォールバック
+        if ($request->is('api/*') || $request->expectsJson()) {
+            $errorService = new ErrorHandlingService();
+            $errorResponse = $errorService->handleException($exception, $request);
+            return response()->json($errorResponse, $errorResponse['status_code'] ?? 500);
         }
 
         return parent::render($request, $exception);
@@ -55,17 +66,5 @@ class Handler extends ExceptionHandler
     /**
      * バリデーション例外の処理
      */
-    protected function handleValidationException(ValidationException $exception, Request $request)
-    {
-        if ($request->expectsJson()) {
-            return response()->json([
-                'success' => false,
-                'error_code' => 'VALIDATION_ERROR',
-                'message' => '入力データに問題があります。',
-                'errors' => $exception->errors(),
-            ], 422);
-        }
-
-        return parent::handleValidationException($exception, $request);
-    }
+    // 専用ハンドラは不要（render 内で対応）
 }
