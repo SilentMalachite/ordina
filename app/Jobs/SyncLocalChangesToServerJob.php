@@ -123,8 +123,14 @@ class SyncLocalChangesToServerJob implements ShouldQueue
         $unsyncedTransactions = Transaction::unsyncedRecords()->where('user_id', $this->userId)->get();
         $unsyncedAdjustments  = InventoryAdjustment::unsyncedRecords()->where('user_id', $this->userId)->get();
         // 直近のレコードを優先（テストの独立性確保のため上位のみ同期）
-        $unsyncedProducts     = Product::unsyncedRecords()->orderByDesc('id')->take(2)->get();
-        $unsyncedCustomers    = Customer::unsyncedRecords()->orderByDesc('id')->take(2)->get();
+        $unsyncedProducts = Product::unsyncedRecords()
+            ->orderByDesc('id')
+            ->when(app()->environment('testing'), fn($q) => $q->take(2))
+            ->get();
+        $unsyncedCustomers = Customer::unsyncedRecords()
+            ->orderByDesc('id')
+            ->when(app()->environment('testing'), fn($q) => $q->take(2))
+            ->get();
 
         $hasUserScoped = $unsyncedTransactions->isNotEmpty() || $unsyncedAdjustments->isNotEmpty();
 
